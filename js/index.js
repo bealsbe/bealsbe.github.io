@@ -17,8 +17,24 @@ function resize() {
 }
 
 var memes = [];
-var cap = 250;
+var cap = 100;
 var hyper = false;
+
+function hyperEnable() { // eslint-disable-line no-unused-vars
+  hyper = true;
+  cap = 1000;
+  document.querySelector(`#memeplane`).style.animationName = `fly-plane-extreme`;
+  document.querySelector(`#memeplane`).style.animationDuration = `0.7s`;
+  document.querySelector(`#memeplane`).style.animationTimingFunction = `linear`;
+}
+
+function hyperDisable() { // eslint-disable-line no-unused-vars
+  hyper = false;
+  cap = 250;
+  document.querySelector(`#memeplane`).style.animationName = `fly-plane`;
+  document.querySelector(`#memeplane`).style.animationDuration = `50ms`;
+  document.querySelector(`#memeplane`).style.animationTimingFunction = `ease-in-out`;
+}
 
 function draw() {
   ctx.clearRect(0, 0, cnvs.width, cnvs.height);
@@ -89,7 +105,7 @@ function spawnMeme() {
     , x: x, y: y
     , width: img.width * far
     , height: img.height * far
-    , speed: img.width * far / 15
+    , speed: img.width * far / 30
     , rot: Math.random() * 2
   });
 }
