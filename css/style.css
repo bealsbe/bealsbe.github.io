@@ -13,6 +13,23 @@ Generic.sucks source: https://github.com/memework/generic-sucks
           animation: fly-plane 100ms infinite ease-in-out;
 }
 
+html, body {
+  overflow: hidden;
+}
+
+.images {
+  display: none;
+}
+
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -50;
+}
+
 @keyframes fly-plane {
   0% {
     transform: translate(-2px, 2px) rotate(-35deg);
