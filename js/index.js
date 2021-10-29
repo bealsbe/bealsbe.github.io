@@ -105,7 +105,7 @@ function spawnMeme() {
     , x: x, y: y
     , width: img.width * far
     , height: img.height * far
-    , speed: img.width * far / 30
+    , speed: img.width * far / 20
     , rot: Math.random() * 2
   });
 }
