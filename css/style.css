@@ -44,7 +44,7 @@ hr{
 #twitter_button {
   background-color: #1DA1F2 !important;
   border-color: black !important;
-  width: 140px !important;
+  width: 130px !important;
   height: 72px !important;
   padding-top: 15px;
 }
@@ -59,7 +59,7 @@ hr{
 #telegram_button {
   background-color: #0088cc !important;
   border-color: black !important;
-  width: 140px !important;
+  width: 130px !important;
   height: 72px !important;
   padding-top: 15px;
 }
@@ -73,7 +73,7 @@ hr{
 #discord_button {
   background-color: #7289DA !important;
   border-color: black !important;
-  width: 140px !important;
+  width: 130px !important;
   height: 72px !important;
   padding-top: 15px;
 }
@@ -88,7 +88,7 @@ hr{
   background-color: #f5f5f5 !important;
   border-color: black !important;
   color: black;
-  width: 140px !important;
+  width: 130px !important;
   height: 72px !important;
   padding-top: 15px;
 }
@@ -102,7 +102,7 @@ hr{
 #fa_button {
   background-color: #FAAF3A !important;
   border-color: black !important;
-  width: 140px !important;
+  width: 130px !important;
   height: 72px !important;
   padding-top: 12px;
 }
