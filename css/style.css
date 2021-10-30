@@ -29,32 +29,6 @@ canvas {
   height: 100vh;
   z-index: -50;
 }
-
-@keyframes fly-plane {
-  0% {
-    transform: translate(-2px, 2px) rotate(-35deg);
-  }
-  25% {
-    transform: translate(2px, -2px) rotate(-35deg);
-  }
-  50% {
-    transform: translate(-2px, 1px) rotate(-35deg);
-  }
-  75% {
-    transform: translate(2px, 2px) rotate(-35deg);
-  }
-  100% {
-    transform: translate(2px, 3px) rotate(-35deg);
-  }
-}
-
-@keyframes fly-plane-extreme {
-  100% {
-    -webkit-transform: rotate(360deg);
-    transform: rotate(360deg);
-  }
-}
-
 .icon-twitter{
   background-image : url(img/twitter.png);
   background-size: cover;

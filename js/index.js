@@ -20,13 +20,6 @@ var memes = [];
 var cap = 100;
 var hyper = false;
 
-function hyperEnable() { // eslint-disable-line no-unused-vars
-  hyper = true;
-  cap = 1000;
-  document.querySelector(`#memeplane`).style.animationName = `fly-plane-extreme`;
-  document.querySelector(`#memeplane`).style.animationDuration = `0.7s`;
-  document.querySelector(`#memeplane`).style.animationTimingFunction = `linear`;
-}
 
 function hyperDisable() { // eslint-disable-line no-unused-vars
   hyper = false;
@@ -97,7 +90,7 @@ function spawnMeme() {
   var far = Math.random();
   if (far > 0.35) far = 0.35;
   var img = images[Math.floor(Math.random() * images.length)];
-  var x = Math.floor(Math.random() * innerWidth);
+  var x = Math.floor(Math.random() * innerWidth)*2;
   var y = 0 - img.height * 2;
 
   memes.push({
