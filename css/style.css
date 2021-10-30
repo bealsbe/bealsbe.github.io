@@ -29,16 +29,80 @@ canvas {
   height: 100vh;
   z-index: -50;
 }
-.icon-twitter{
-  background-image : url(img/twitter.png);
-  background-size: cover;
-  display: inline-block;
-  height: 15px;
-  width: 15px;
-}
 
 hr{
   height: 2px;
   background-color: #FFBD00;
   border: none;
+}
+
+.btn {
+  margin-top: 10px;
+}
+
+#twitter_button {
+  background-color: #1DA1F2 !important;
+  border-color: black !important;
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+#twitter_button:hover,
+#twitter_button:active,
+#twitter_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
+}
+
+
+#telegram_button {
+  background-color: #0088cc !important;
+  border-color: black !important;
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+#telegram_button:hover,
+#telegram_button:active,
+#telegram_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
+}
+
+#discord_button {
+  background-color: #7289DA !important;
+  border-color: black !important;
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+#discord_button:hover,
+#discord_button:active,
+#discord_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
+}
+
+#github_button {
+  background-color: #f5f5f5 !important;
+  border-color: black !important;
+  color: black;
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+#github_button:hover,
+#github_button:active,
+#github_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
+}
+
+#fa_button {
+  background-color: #FAAF3A !important;
+  border-color: black !important;
+  padding-top: 15px;
+  padding-bottom: 15px;
+}
+#fa_button:hover,
+#fa_button:active,
+#fa_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
 }
