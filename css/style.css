@@ -14,7 +14,7 @@ Generic.sucks source: https://github.com/memework/generic-sucks
 }
 
 html, body {
-  overflow: hidden;
+  touch-action: auto;
 }
 
 .images {
@@ -22,13 +22,13 @@ html, body {
 }
 
 canvas {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
   z-index: -50;
-  touch-action: auto;
+  overflow: hidden;
 }
 
 hr{
