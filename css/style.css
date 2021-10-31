@@ -98,6 +98,33 @@ hr{
   background-color: #657786 !important;
   border-color: black !important;
 }
+#vrchat_button {
+  background-color: gray !important;
+  border-color: black !important;
+  width: 130px !important;
+  height: 72px !important;
+  padding-top: 10px;
+}
+#vrchat_button:hover,
+#vrchat_button:active,
+#vrchat_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
+}
+
+#steam_button {
+  background-color:#171a21 !important;
+  border-color: black !important;
+  width: 130px !important;
+  height: 72px !important;
+  padding-top: 15px;
+}
+#steam_button:hover,
+#steam_button:active,
+#steam_button:focus {
+  background-color: #657786 !important;
+  border-color: black !important;
+}
 
 #fa_button {
   background-color: #FAAF3A !important;
