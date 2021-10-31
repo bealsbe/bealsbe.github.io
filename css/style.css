@@ -2,7 +2,6 @@
 Credit to generic.sucks for the website code.
 Images belong to their respective owners.
 More info can be found at /credit/.
-
 Source: https://github.com/Purpzie/sucks
 Generic.sucks source: https://github.com/memework/generic-sucks
 */
@@ -19,6 +18,14 @@ html, body {
 
 .images {
   display: none;
+}
+
+.vertical-center {
+  min-height: 50%;  /* Fallback for browsers do NOT support vh unit */
+  min-height: 50vh; /* These two lines are counted as one :-)       */
+
+  display: flex;
+  align-items: center;
 }
 
 canvas {
