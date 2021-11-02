@@ -21,6 +21,7 @@ html, body {
 }
 
 .vertical-center {
+  padding-top: 15px;
   min-height: 50%;  /* Fallback for browsers do NOT support vh unit */
   min-height: 50vh; /* These two lines are counted as one :-)       */
 
