@@ -56,6 +56,13 @@ hr{
   height: 72px !important;
   padding-top: 15px;
 }
+#mastodon_button {
+  background-color: #563ACC !important;
+  border-color: black !important;
+  width: 130px !important;
+  height: 72px !important;
+  padding-top: 15px;
+}
 #twitter_button:hover,
 #twitter_button:active,
 #twitter_button:focus {
