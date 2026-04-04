@@ -7,8 +7,8 @@ Source: https://github.com/Purpzie/sucks
 /* === Variables === */
 :root {
   --accent: #FF6D00;
-  --card-bg: rgba(10, 10, 18, 0.4);
-  --card-border: rgba(255, 109, 0, 0.6);
+  --card-bg: rgba(10, 10, 18, 0.12);
+  --card-border: rgba(255, 109, 0, 0.85);
   --text: #ffffff;
   --text-muted: rgba(255, 255, 255, 0.88);
 }
@@ -54,6 +54,13 @@ canvas {
   border-radius: 100px;
   padding: 6px;
   z-index: 100;
+  transition: opacity 250ms ease, transform 250ms ease;
+}
+
+.site-nav.nav-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(-50%) translateY(-12px);
 }
 
 .nav-link {
@@ -94,7 +101,11 @@ main {
   min-height: 100dvh;
   display: flex;
   align-items: center;
-  padding: 16px 12px;
+  padding: 80px 16px 32px;
+}
+
+.ref-page main {
+  padding-top: 110px;
 }
 /* === Page transitions === */
 @keyframes card-enter {
@@ -121,8 +132,8 @@ main {
   max-width: 860px;
   margin: auto;
   background: var(--card-bg);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   padding: 36px 28px 32px;
@@ -143,6 +154,33 @@ main {
 }
 
 /* === Avatar === */
+.avatar-link {
+  position: relative;
+  display: block;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+#avatar-tip {
+  position: fixed;
+  transform: translateX(-50%);
+  background: rgba(10, 10, 18, 0.95);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  padding: 5px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 9999;
+}
+
+#avatar-tip.visible {
+  opacity: 1;
+}
+
 .avatar {
   width: 130px;
   height: 130px;
@@ -241,6 +279,136 @@ main {
 .link-btn .spacer {
   width: 22px;
   flex-shrink: 0;
+}
+
+/* === Discord modal === */
+.discord-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+.discord-overlay.visible {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.discord-modal {
+  background: rgba(10, 10, 18, 0.92);
+  border: 1px solid rgba(88, 101, 242, 0.85);
+  border-radius: 16px;
+  padding: 28px 32px 24px;
+  min-width: 260px;
+  text-align: center;
+  position: relative;
+  transform: scale(0.93);
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+}
+
+.discord-overlay.visible .discord-modal {
+  transform: scale(1);
+}
+
+.discord-modal-close {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  transition: color 150ms ease;
+}
+
+.discord-modal-close:hover {
+  color: var(--text);
+}
+
+.discord-modal-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #5865F2;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+.discord-modal-username {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+/* === Toast === */
+.toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: rgba(10, 10, 18, 0.92);
+  border: 1px solid #3ba55c;
+  color: #3ba55c;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 100px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease, transform 200ms ease;
+  z-index: 9999;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+
+/* === Mobile === */
+@media (max-width: 699px) {
+  .profile-card {
+    padding: 24px 18px 20px;
+  }
+
+.name {
+    font-size: 0.85rem;
+  }
+
+  .pronouns {
+    margin: 0 0 10px;
+  }
+
+  .bio {
+    font-size: 0.88rem;
+  }
+
+  .divider {
+    margin: 16px 0;
+  }
+
+  .link-btn {
+    padding: 11px 14px;
+    font-size: 0.88rem;
+  }
+
+  .links {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 /* === Desktop === */

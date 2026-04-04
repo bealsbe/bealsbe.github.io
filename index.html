@@ -9,15 +9,17 @@
 <link rel="stylesheet" href="css/ref.css">
   </head>
   <body>
-    <!-- nav class="site-nav">
+    <nav class="site-nav">
       <a href="index.html" class="nav-link active">Home</a>
       <a href="ref/index.html" class="nav-link">Character Ref</a>
-    </nav -->
+    </nav>
 
     <main>
       <div class="profile-card">
         <div class="profile-header">
-          <img src="img/icon.png" alt="Beals" class="avatar">
+          <a href="http://www.silvixen.com/" target="_blank" class="avatar-link" data-tooltip="Art by Silvixen">
+            <img src="img/icon.png" alt="Beals" class="avatar">
+          </a>
           <div class="profile-text">
             <h1 class="name">Beals</h1>
             <p class="bio">Hello there, I'm Beals! Currently residing in the beautiful state of Oregon. Life to me is an adventure and too short not to be yourself</p>
@@ -25,44 +27,44 @@
         </div>
         <div class="divider"></div>
         <div class="links">
-          <a href="https://sfw.furaffinity.net/user/beals/" class="link-btn" style="--btn-bg: #FAAF3A; --btn-color: #1a0d00;">
+          <a href="https://sfw.furaffinity.net/user/beals/" class="link-btn" style="--btn-bg: #FAAF3A;">
             <img src="img/fa.png" alt="" class="icon">
-            <span class="label">Beals</span>
+            <span class="label">Fur Affinity</span>
             <span class="spacer"></span>
           </a>
           <a rel="me" href="https://bsky.app/profile/beals.gay" class="link-btn" style="--btn-bg: #1185fe;">
             <img src="img/Bluesky_Logo.png" alt="" class="icon">
-            <span class="label">@beals.gay</span>
+            <span class="label">Bluesky</span>
             <span class="spacer"></span>
           </a>
-          <a class="link-btn" style="--btn-bg: #5865F2;">
+          <a id="discord-btn" class="link-btn" style="--btn-bg: #5865F2; cursor: pointer;">
             <img src="img/discord.png" alt="" class="icon">
-            <span class="label">beals</span>
+            <span class="label">Discord</span>
             <span class="spacer"></span>
           </a>
           <a href="https://t.me/Beals" class="link-btn" style="--btn-bg: #0088cc;">
             <img src="img/telegram.png" alt="" class="icon">
-            <span class="label">beals</span>
+            <span class="label">Telegram</span>
             <span class="spacer"></span>
           </a>
           <a href="https://steamcommunity.com/id/bealsabub" class="link-btn" style="--btn-bg: #1b2838;">
             <img src="img/steam.png" alt="" class="icon">
-            <span class="label">Bealsabub</span>
+            <span class="label">Steam</span>
             <span class="spacer"></span>
           </a>
           <a href="https://vrchat.com/home/user/usr_a2014a83-892b-4fdf-8396-775e1e39d531" class="link-btn" style="--btn-bg: #4a4f5c;">
             <img src="img/vr_chat.png" alt="" class="icon">
-            <span class="label">Beals</span>
+            <span class="label">VRChat</span>
             <span class="spacer"></span>
           </a>
           <a href="https://www.furtrack.com/index/photographer:beals" class="link-btn" style="--btn-bg: #2c0e4c;">
             <img src="img/furtrack.png" alt="" class="icon" style="transform: scale(1.3);">
-            <span class="label">beals</span>
+            <span class="label">Furtrack</span>
             <span class="spacer"></span>
           </a>
           <a href="https://github.com/bealsbe" class="link-btn" style="--btn-bg: #f0f0f0; --btn-color: #111;">
             <img src="img/github.png" alt="" class="icon">
-            <span class="label">Bealsbe</span>
+            <span class="label">GitHub</span>
             <span class="spacer"></span>
           </a>
         </div>
@@ -79,5 +81,66 @@
 
     <script type="text/javascript" src="js/index.js"></script>
     <script type="text/javascript" src="js/transitions.js"></script>
+    <script>
+      const tip = document.createElement('div');
+      tip.id = 'avatar-tip';
+      tip.textContent = 'Art by Silvixen';
+      document.body.appendChild(tip);
+
+      const link = document.querySelector('.avatar-link');
+      link.addEventListener('mouseenter', e => {
+        const r = link.getBoundingClientRect();
+        tip.style.left = (r.left + r.width / 2) + 'px';
+        tip.style.top  = (r.bottom + 8) + 'px';
+        tip.classList.add('visible');
+      });
+      link.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+
+      // Toast
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = 'Copied to clipboard!';
+      document.body.appendChild(toast);
+      let toastTimeout;
+      function showToast() {
+        toast.classList.add('visible');
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => toast.classList.remove('visible'), 2000);
+      }
+
+      // Discord modal
+      const discordOverlay = document.createElement('div');
+      discordOverlay.className = 'discord-overlay';
+      discordOverlay.innerHTML = `
+        <div class="discord-modal">
+          <button class="discord-modal-close" aria-label="Close">&times;</button>
+          <p class="discord-modal-label">Discord</p>
+          <p class="discord-modal-username">beals</p>
+        </div>
+      `;
+      document.body.appendChild(discordOverlay);
+
+      const discordClose = discordOverlay.querySelector('.discord-modal-close');
+
+      function openDiscordModal() {
+        discordOverlay.classList.add('visible');
+      }
+      function closeDiscordModal() {
+        discordOverlay.classList.remove('visible');
+      }
+
+      document.getElementById('discord-btn').addEventListener('click', e => {
+        e.preventDefault();
+        navigator.clipboard?.writeText('beals');
+        showToast();
+        openDiscordModal();
+      });
+
+      discordClose.addEventListener('click', closeDiscordModal);
+      discordOverlay.addEventListener('click', e => {
+        if (e.target === discordOverlay) closeDiscordModal();
+      });
+
+    </script>
   </body>
 </html>

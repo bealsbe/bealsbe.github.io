@@ -40,9 +40,35 @@ window.addEventListener('load', () => {
   draw();
 });
 
+// Colors with good contrast against dark backgrounds
+const BG_COLORS_SRC = [
+  [  0, 180, 150],  // teal
+  [ 20, 170,  90],  // green
+  [ 20, 150, 210],  // cyan
+  [110,  40, 210],  // purple
+  [ 40,  80, 220],  // deep blue
+  [190,  20, 150],  // magenta
+];
+// Fisher-Yates shuffle
+const BG_COLORS = [...BG_COLORS_SRC];
+for (let i = BG_COLORS.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [BG_COLORS[i], BG_COLORS[j]] = [BG_COLORS[j], BG_COLORS[i]];
+}
+let colorTime = 0;
+
 function draw() {
   ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = 'rgb(10, 10, 18)';
+
+  // Slowly cycle: black → color → black
+  colorTime += 1 / 900; // ~15s per color at 60fps
+  const cyclePos  = colorTime % BG_COLORS.length;
+  const idx       = Math.floor(cyclePos);
+  const t         = cyclePos - idx;
+  const intensity = Math.sin(t * Math.PI) * 0.14; // subtle tint, max 14%
+  const [r, g, b] = BG_COLORS[idx % BG_COLORS.length];
+
+  ctx.fillStyle = `rgb(${Math.round(10 + r * intensity)}, ${Math.round(10 + g * intensity)}, ${Math.round(18 + b * intensity)})`;
   ctx.fillRect(0, 0, W, H);
 
   // Draw back-to-front so closer sprites appear on top

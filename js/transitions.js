@@ -53,13 +53,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const curCard = document.querySelector('.profile-card');
     if (!newCard || !curCard) { window.location.href = absUrl; return; }
 
+    // Push state BEFORE swapping card so relative image URLs in the new card
+    // resolve against the correct base URL (not the previous page's URL).
+    if (pushState) history.pushState({ absUrl }, '', absUrl);
+
     // Remove page-exit before inserting new card so it only gets card-enter
     document.body.classList.remove('page-exit');
 
     curCard.replaceWith(newCard);
     document.title = newDoc.title;
-
-    if (pushState) history.pushState({ absUrl }, '', absUrl);
 
     const targetPath = new URL(absUrl).pathname;
     links.forEach(link => {
@@ -83,4 +85,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const url = e.state?.absUrl || window.location.href;
     navigateTo(url, false);
   });
+
+  // Hide nav on scroll, show when back at top
+  let lastScroll = 0;
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    nav.classList.toggle('nav-hidden', y > 20);
+    lastScroll = y;
+  }, { passive: true });
 });
