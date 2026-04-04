@@ -63,9 +63,10 @@ document.addEventListener('DOMContentLoaded', () => {
     curCard.replaceWith(newCard);
     document.title = newDoc.title;
 
-    const targetPath = new URL(absUrl).pathname;
+    const normPath = p => p.replace(/index\.html$/, '').replace(/\/$/, '') || '/';
+    const targetPath = normPath(new URL(absUrl).pathname);
     links.forEach(link => {
-      const linkPath = new URL(linkURLs.get(link)).pathname;
+      const linkPath = normPath(new URL(linkURLs.get(link)).pathname);
       link.classList.toggle('active', linkPath === targetPath);
     });
     activeLink = nav.querySelector('.nav-link.active');
