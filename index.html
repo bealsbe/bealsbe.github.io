@@ -87,14 +87,17 @@
       tip.textContent = 'Art by Silvixen';
       document.body.appendChild(tip);
 
-      const link = document.querySelector('.avatar-link');
-      link.addEventListener('mouseenter', e => {
+      document.body.addEventListener('mouseenter', e => {
+        const link = e.target.closest('.avatar-link');
+        if (!link) return;
         const r = link.getBoundingClientRect();
         tip.style.left = (r.left + r.width / 2) + 'px';
         tip.style.top  = (r.bottom + 8) + 'px';
         tip.classList.add('visible');
-      });
-      link.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+      }, true);
+      document.body.addEventListener('mouseleave', e => {
+        if (e.target.closest('.avatar-link')) tip.classList.remove('visible');
+      }, true);
 
       // Toast
       const toast = document.createElement('div');
@@ -129,11 +132,13 @@
         discordOverlay.classList.remove('visible');
       }
 
-      document.getElementById('discord-btn').addEventListener('click', e => {
-        e.preventDefault();
-        navigator.clipboard?.writeText('beals');
-        showToast();
-        openDiscordModal();
+      document.body.addEventListener('click', e => {
+        if (e.target.closest('#discord-btn')) {
+          e.preventDefault();
+          navigator.clipboard?.writeText('beals');
+          showToast();
+          openDiscordModal();
+        }
       });
 
       discordClose.addEventListener('click', closeDiscordModal);

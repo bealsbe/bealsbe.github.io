@@ -18,10 +18,14 @@ Source: https://github.com/Purpzie/sucks
   box-sizing: border-box;
 }
 
+html {
+  -webkit-overflow-scrolling: touch;
+}
+
 html, body {
   margin: 0;
   padding: 0;
-  touch-action: auto;
+  touch-action: pan-y;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -33,6 +37,7 @@ canvas {
   width: 100vw;
   height: 100vh;
   z-index: -1;
+  will-change: transform;
 }
 
 .images {
@@ -139,6 +144,7 @@ main {
   padding: 36px 28px 32px;
   display: flex;
   flex-direction: column;
+  will-change: transform;
 }
 
 /* === Profile header === */
