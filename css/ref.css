@@ -1,0 +1,103 @@
+.ref-card {
+  max-width: 960px;
+}
+
+.ref-header {
+  margin-bottom: 4px;
+}
+
+.ref-header .bio {
+  margin-top: 6px;
+}
+
+/* === Two-column body === */
+.ref-body {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+@media (min-width: 700px) {
+  .ref-body {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 48px;
+  }
+
+  .ref-description {
+    flex: 0 0 260px;
+  }
+
+  .ref-gallery {
+    flex: 1;
+  }
+}
+
+/* === Description === */
+.ref-description p {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  line-height: 1.65;
+  margin: 0 0 24px;
+}
+
+.ref-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 10px;
+}
+
+.ref-bullets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ref-bullets li {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  padding-left: 16px;
+  position: relative;
+}
+
+.ref-bullets li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* === Gallery === */
+.ref-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.gallery-item {
+  display: block;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.gallery-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 220px;
+  object-fit: cover;
+  display: block;
+}

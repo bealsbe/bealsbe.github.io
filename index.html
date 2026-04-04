@@ -2,56 +2,83 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <!-- The above 3 meta tags *must* come first in the head; any other head content must come *after* these tags -->
-    <title>Merp!</title>
-    <link href="css/bootstrap.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
-    <link rel="stylesheet" href="css/style.css">
+    <title>Beals</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/ref.css">
   </head>
   <body>
-<main>
-    <div class="container px-5 vertical-center">
-    <div class="p-0 mb-3 rounded-3">
-        <div class="container-fluid py-1 text-white">
-          <div class="text-center">
-            <img src="img/icon.png" class="img-fluid">
+    <!-- nav class="site-nav">
+      <a href="index.html" class="nav-link active">Home</a>
+      <a href="ref/index.html" class="nav-link">Character Ref</a>
+    </nav -->
+
+    <main>
+      <div class="profile-card">
+        <div class="profile-header">
+          <img src="img/icon.png" alt="Beals" class="avatar">
+          <div class="profile-text">
+            <h1 class="name">Beals</h1>
+            <p class="pronouns">they/them</p>
+            <p class="bio">Hello there, I'm Beals! Currently residing in the beautiful state of Oregon. Life to me is an adventure and too short not to be yourself. I love video games, the outdoors, and those deep conversations about the meaning of life.</p>
           </div>
-          <br>
-          <div id="text-content">
-          <p class="fs-5">Hello there, I’m Beals! Currently residing in the beautiful state of Oregon.  Life to me is an adventure and too short not to be yourself. I love video games, the outdoors, and those deep conversations about the meaning of life.
-          </p>
         </div>
-          <hr>
-          <center>
-            <!-- https://www.youtube.com/watch?v=XeFxdkaFzRA -->
-<a id="fa_button" href="https://sfw.furaffinity.net/user/beals/" type="button" class="btn btn-primary"> <img src="img/fa.png"/><br>Beals</a>
-            <a rel="me" id="bluesky_button" href="https://bsky.app/profile/beals.gay" type="button" class="btn btn-primary"> <img src="img/Bluesky_Logo.png"/><br>@beals.gay</a>
-            <a id="discord_button" type="button" class="btn btn-primary"> <img src="img/discord.png"/><br>beals</a>
-            <a id="telegram_button" href="https://t.me/Beals" type="button" class="btn btn-primary"> <img src="img/telegram.png"/><br>beals</a>
-            <a id="steam_button" href="https://steamcommunity.com/id/bealsabub" type="button" class="btn btn-primary"> <img src="img/steam.png"/><br>Bealsabub</a>
-            <a id="vrchat_button" href="https://vrchat.com/home/user/usr_a2014a83-892b-4fdf-8396-775e1e39d531" type="button" class="btn btn-primary"> <img src="img/vrchat.png"/><br><p id='vrchat_text'>Beals</p></a>
-            <a id="github_button" href="https://github.com/bealsbe" type="button" class="btn btn-primary"> <img src="img/github.png"/><br>Bealsbe</a>
-          </center>
-          </div>
+        <div class="divider"></div>
+        <div class="links">
+          <a href="https://sfw.furaffinity.net/user/beals/" class="link-btn" style="--btn-bg: #FAAF3A; --btn-color: #1a0d00;">
+            <img src="img/fa.png" alt="" class="icon">
+            <span class="label">Beals</span>
+            <span class="spacer"></span>
+          </a>
+          <a rel="me" href="https://bsky.app/profile/beals.gay" class="link-btn" style="--btn-bg: #1185fe;">
+            <img src="img/Bluesky_Logo.png" alt="" class="icon">
+            <span class="label">@beals.gay</span>
+            <span class="spacer"></span>
+          </a>
+          <a class="link-btn" style="--btn-bg: #5865F2;">
+            <img src="img/discord.png" alt="" class="icon">
+            <span class="label">beals</span>
+            <span class="spacer"></span>
+          </a>
+          <a href="https://t.me/Beals" class="link-btn" style="--btn-bg: #0088cc;">
+            <img src="img/telegram.png" alt="" class="icon">
+            <span class="label">beals</span>
+            <span class="spacer"></span>
+          </a>
+          <a href="https://steamcommunity.com/id/bealsabub" class="link-btn" style="--btn-bg: #1b2838;">
+            <img src="img/steam.png" alt="" class="icon">
+            <span class="label">Bealsabub</span>
+            <span class="spacer"></span>
+          </a>
+          <a href="https://vrchat.com/home/user/usr_a2014a83-892b-4fdf-8396-775e1e39d531" class="link-btn" style="--btn-bg: #4a4f5c;">
+            <img src="img/vr_chat.png" alt="" class="icon">
+            <span class="label">Beals</span>
+            <span class="spacer"></span>
+          </a>
+          <a href="https://www.furtrack.com/index/photographer:beals" class="link-btn" style="--btn-bg: #2c0e4c;">
+            <img src="img/furtrack.png" alt="" class="icon" style="transform: scale(1.3);">
+            <span class="label">beals</span>
+            <span class="spacer"></span>
+          </a>
+          <a href="https://github.com/bealsbe" class="link-btn" style="--btn-bg: #f0f0f0; --btn-color: #111;">
+            <img src="img/github.png" alt="" class="icon">
+            <span class="label">Bealsbe</span>
+            <span class="spacer"></span>
+          </a>
+        </div>
       </div>
+    </main>
+
+    <canvas></canvas>
+
+    <div class="images">
+      <img id="img-merp1" src="img/merp1.png">
+      <img id="img-merp2" src="img/merp2.png">
+      <img id="img-bealsonwheels" src="img/bealsonwheels.png">
     </div>
 
-</main>
-
-<canvas></canvas>
-<script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
-    <script src="js/bootstrap.js"></script>
-    <!-- images used in the canvas code -->
-<div class="images">
-    <img id="img-merp1" src="img/merp1.png">
-    <img id="img-merp2" src="img/merp2.png">
-    <img id="img-bealsonwheels" src="img/bealsonwheels.png">
-    <img id="img-beals11" src="img/beals 11.png">
-  </div>
-  
     <script type="text/javascript" src="js/index.js"></script>
+    <script type="text/javascript" src="js/transitions.js"></script>
   </body>
 </html>
