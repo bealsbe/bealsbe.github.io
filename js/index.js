@@ -9,7 +9,7 @@ window.addEventListener('load', async () => {
     try {
       const bitmaps  = await Promise.all(imgEls.map(img => createImageBitmap(img)));
       const offscreen = cnvs.transferControlToOffscreen();
-      const worker    = new Worker('js/canvas-worker.js');
+      const worker    = new Worker('/js/canvas-worker.js');
 
       worker.postMessage(
         { type: 'init', canvas: offscreen, bitmaps, width: innerWidth, height: innerHeight },
