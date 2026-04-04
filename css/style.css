@@ -49,25 +49,12 @@ hr{
   margin-top: 10px;
 }
 
-#twitter_button {
-  background-color: #1DA1F2 !important;
-  border-color: black !important;
-  width: 130px !important;
-  height: 72px !important;
-  padding-top: 15px;
-}
 #bluesky_button {
   background-color: #1185fe !important;
   border-color: black !important;
   width: 130px !important;
   height: 72px !important;
   padding-top: 15px;
-}
-#twitter_button:hover,
-#twitter_button:active,
-#twitter_button:focus {
-  background-color: #657786 !important;
-  border-color: black !important;
 }
 
 
