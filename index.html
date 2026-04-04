@@ -17,9 +17,9 @@
     <main>
       <div class="profile-card">
         <div class="profile-header">
-          <a href="http://www.silvixen.com/" target="_blank" class="avatar-link" data-tooltip="Art by Silvixen">
+          <div class="avatar-link">
             <img src="img/icon.png" alt="Beals" class="avatar">
-          </a>
+          </div>
           <div class="profile-text">
             <h1 class="name">Beals</h1>
             <p class="bio">Hello there, I'm Beals! Currently residing in the beautiful state of Oregon. Life to me is an adventure and too short not to be yourself</p>
@@ -87,17 +87,20 @@
       tip.textContent = 'Art by Silvixen';
       document.body.appendChild(tip);
 
-      document.body.addEventListener('mouseenter', e => {
+      let avatarTipTimeout;
+      document.body.addEventListener('click', e => {
         const link = e.target.closest('.avatar-link');
-        if (!link) return;
+        if (!link) {
+          tip.classList.remove('visible');
+          return;
+        }
         const r = link.getBoundingClientRect();
         tip.style.left = (r.left + r.width / 2) + 'px';
-        tip.style.top  = (r.bottom + 8) + 'px';
+        tip.style.top  = (r.top - 36) + 'px';
         tip.classList.add('visible');
-      }, true);
-      document.body.addEventListener('mouseleave', e => {
-        if (e.target.closest('.avatar-link')) tip.classList.remove('visible');
-      }, true);
+        clearTimeout(avatarTipTimeout);
+        avatarTipTimeout = setTimeout(() => tip.classList.remove('visible'), 2500);
+      });
 
       // Toast
       const toast = document.createElement('div');
