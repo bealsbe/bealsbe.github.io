@@ -37,6 +37,15 @@ function randomSprite(spreadZ) {
   };
 }
 
+// Mutate an existing sprite in-place to avoid allocating a new object each reset
+function resetSprite(s, spreadZ) {
+  s.x     = (Math.random() - 0.5) * SPREAD;
+  s.y     = (Math.random() - 0.5) * SPREAD;
+  s.z     = spreadZ ? Math.random() * Z_FAR : Z_FAR;
+  s.speed = Math.random() * 0.8 + 0.3;
+  s.img   = bitmaps[Math.floor(Math.random() * bitmaps.length)];
+}
+
 function draw() {
   ctx.clearRect(0, 0, W, H);
 
@@ -57,7 +66,7 @@ function draw() {
     s.z -= s.speed;
 
     if (s.z <= Z_NEAR) {
-      Object.assign(s, randomSprite(false));
+      resetSprite(s, false);
       continue;
     }
 
@@ -68,19 +77,17 @@ function draw() {
     const h     = s.img.height * scale;
 
     if (sx + w < 0 || sx - w > W || sy + h < 0 || sy - h > H) {
-      Object.assign(s, randomSprite(false));
+      resetSprite(s, false);
       continue;
     }
 
     const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
     const tNear = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
-    const alpha = tFar * tNear;
-
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, alpha);
+    ctx.globalAlpha = Math.max(0, tFar * tNear);
     ctx.drawImage(s.img, sx - w / 2, sy - h / 2, w, h);
-    ctx.restore();
   }
+
+  ctx.globalAlpha = 1;
 
   requestAnimationFrame(draw);
 }
