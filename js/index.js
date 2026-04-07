@@ -1,5 +1,14 @@
 'use strict';
 
+function copyHex(btn, hex) {
+  navigator.clipboard.writeText(hex);
+  const span = btn.querySelector('.swatch-hex');
+  const prev = span.textContent;
+  span.textContent = 'Copied!';
+  btn.style.opacity = '0.8';
+  setTimeout(() => { span.textContent = prev; btn.style.opacity = ''; }, 1200);
+}
+
 const cnvs   = document.querySelector('canvas');
 const imgEls = Array.from(document.querySelectorAll('.images img'));
 
