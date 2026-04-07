@@ -45,6 +45,37 @@
   transform: scale(0.92);
   opacity: 0;
   transition: transform 550ms cubic-bezier(0.34, 1.2, 0.64, 1), opacity 450ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* CRT scanlines + vignette */
+.gender-modal::before,
+.gender-modal::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 12px;
+  z-index: 10;
+}
+
+.gender-modal::before {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 2px,
+    rgba(0, 0, 0, 0.13) 2px,
+    rgba(0, 0, 0, 0.13) 4px
+  );
+}
+
+.gender-modal::after {
+  background: radial-gradient(
+    ellipse at center,
+    transparent 55%,
+    rgba(0, 0, 0, 0.45) 100%
+  );
 }
 
 .gender-modal-output {
