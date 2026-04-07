@@ -32,12 +32,17 @@
 /* === Section titles (8-bit) === */
 .ref-section-title {
   font-family: 'Press Start 2P', monospace;
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   font-weight: 400;
   color: var(--accent);
-  margin: 0 0 14px;
+  margin: 36px 0 14px;
   line-height: 1.4;
   letter-spacing: 0.05em;
+  text-shadow: 0 1px 6px rgba(255, 109, 0, 0.45);
+}
+
+.ref-section-title:first-child {
+  margin-top: 0;
 }
 
 /* === Info rows === */
@@ -91,7 +96,7 @@
 
 .ref-bullets li {
   font-size: 0.88rem;
-  color: var(--text-muted);
+  color: #ffffff;
   line-height: 1.6;
   padding-left: 12px;
   position: relative;
@@ -104,6 +109,46 @@
   color: var(--accent);
   font-size: 0.6rem;
   top: 4px;
+}
+
+/* === Color swatches === */
+.ref-colors {
+  display: flex;
+  gap: 12px;
+  margin: 0 0 28px;
+}
+
+.color-swatch {
+  display: flex;
+}
+
+.swatch {
+  width: 96px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 100ms ease, opacity 100ms ease;
+}
+
+.swatch:hover {
+  transform: translateY(-1px);
+}
+
+.swatch:active {
+  transform: translateY(0);
+}
+
+.swatch-hex {
+  font-size: 0.75rem;
+  font-family: monospace;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 /* === About paragraph === */

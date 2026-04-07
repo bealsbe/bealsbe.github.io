@@ -34,17 +34,27 @@
               <li><span class="detail-label">Orientation</span><span class="detail-value">Demisexual</span></li>
             </ul>
 
-            <!--
-            <h2 class="ref-section-title">Design</h2>
-            <ul class="ref-bullets">
-              <li>Placeholder design detail one.</li>
-              <li>Placeholder design detail two.</li>
-              <li>Placeholder design detail three.</li>
-            </ul>
+            <h2 class="ref-section-title">Colors</h2>
+            <div class="ref-colors">
+              <div class="color-swatch">
+                <button class="swatch" style="background: #9A0201;" onclick="copyHex(this, '#9A0201')"><span class="swatch-hex" style="color: #fff;">#9A0201</span></button>
+              </div>
+              <div class="color-swatch">
+                <button class="swatch" style="background: #E35201;" onclick="copyHex(this, '#E35201')"><span class="swatch-hex" style="color: #111;">#E35201</span></button>
+              </div>
+              <div class="color-swatch">
+                <button class="swatch" style="background: #FFFEFD;" onclick="copyHex(this, '#FFFEFD')"><span class="swatch-hex" style="color: #111;">#FFFEFD</span></button>
+              </div>
+            </div>
 
-            <h2 class="ref-section-title">About</h2>
-            <p class="ref-about">Placeholder personal story — add your character's backstory, personality, and anything else you want people to know here.</p>
-            -->
+            <h2 class="ref-section-title">Markings</h2>
+            <ul class="ref-bullets">
+              <li>Lightning bolt mark on the snout running through nose</li>
+              <li>Chevron markings on the back pointing downward</li>
+              <li>Sets of chevron markings on arms and legs pointing up</li>
+              <li>Thin orange stripe separating the white and red fur</li>
+              <li>The ears contain black tips</li>
+            </ul>
 
           </div>
 
@@ -73,6 +83,16 @@
       <img id="img-bealsonwheels" src="../img/bealsonwheels.png">
     </div>
 
+    <script>
+      function copyHex(btn, hex) {
+        navigator.clipboard.writeText(hex);
+        const span = btn.querySelector('.swatch-hex');
+        const prev = span.textContent;
+        span.textContent = 'Copied!';
+        btn.style.opacity = '0.8';
+        setTimeout(() => { span.textContent = prev; btn.style.opacity = ''; }, 1200);
+      }
+    </script>
     <script type="text/javascript" src="../js/index.js"></script>
     <script type="text/javascript" src="../js/transitions.js"></script>
   </body>
