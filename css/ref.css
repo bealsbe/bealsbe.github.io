@@ -6,6 +6,35 @@
   margin-bottom: 4px;
 }
 
+/* === Error badge === */
+.error-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(180, 20, 20, 0.2);
+  border: 1px solid rgba(220, 40, 40, 0.5);
+  color: #ff6b6b;
+  font-family: monospace;
+  font-size: 0.78rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.03em;
+}
+
+.error-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff4444;
+  flex-shrink: 0;
+  animation: error-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes error-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
 /* === Two-column body === */
 .ref-body {
   display: flex;
@@ -118,10 +147,6 @@
   margin: 0 0 28px;
 }
 
-.color-swatch {
-  display: flex;
-}
-
 .swatch {
   width: 96px;
   height: 36px;
@@ -151,13 +176,6 @@
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
-/* === About paragraph === */
-.ref-about {
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  line-height: 1.75;
-  margin: 0 0 28px;
-}
 
 /* === Gallery === */
 .ref-gallery {
