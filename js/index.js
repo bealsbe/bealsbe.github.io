@@ -1,5 +1,70 @@
 'use strict';
 
+// --- Avatar tip ---
+const tip = document.createElement('div');
+tip.id = 'avatar-tip';
+tip.textContent = 'Art by Silvixen';
+document.body.appendChild(tip);
+
+let avatarTipTimeout;
+document.body.addEventListener('click', e => {
+  const link = e.target.closest('.avatar-link');
+  if (!link) {
+    tip.classList.remove('visible');
+    return;
+  }
+  const r = link.getBoundingClientRect();
+  tip.style.left = (r.left + r.width / 2) + 'px';
+  tip.style.top  = (r.top - 36) + 'px';
+  tip.classList.add('visible');
+  clearTimeout(avatarTipTimeout);
+  avatarTipTimeout = setTimeout(() => tip.classList.remove('visible'), 2500);
+});
+
+// --- Toast ---
+const toast = document.createElement('div');
+toast.className = 'toast';
+toast.textContent = 'Copied to clipboard!';
+document.body.appendChild(toast);
+let toastTimeout;
+function showToast() {
+  toast.classList.add('visible');
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => toast.classList.remove('visible'), 2000);
+}
+
+// --- Discord modal ---
+const discordOverlay = document.createElement('div');
+discordOverlay.className = 'discord-overlay';
+discordOverlay.innerHTML = `
+  <div class="discord-modal">
+    <button class="discord-modal-close" aria-label="Close">&times;</button>
+    <p class="discord-modal-label">Discord</p>
+    <p class="discord-modal-username">beals</p>
+  </div>
+`;
+document.body.appendChild(discordOverlay);
+
+const discordClose = discordOverlay.querySelector('.discord-modal-close');
+
+function openDiscordModal()  { discordOverlay.classList.add('visible'); }
+function closeDiscordModal() { discordOverlay.classList.remove('visible'); }
+
+document.body.addEventListener('click', e => {
+  if (e.target.closest('#discord-btn')) {
+    e.preventDefault();
+    navigator.clipboard?.writeText('beals');
+    showToast();
+    openDiscordModal();
+  }
+});
+
+discordClose.addEventListener('click', closeDiscordModal);
+discordOverlay.addEventListener('click', e => {
+  if (e.target === discordOverlay) closeDiscordModal();
+});
+
+// --- Hex swatch copy ---
 function copyHex(btn, hex) {
   navigator.clipboard.writeText(hex);
   const span = btn.querySelector('.swatch-hex');
