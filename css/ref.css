@@ -78,7 +78,6 @@
   box-shadow: 0 0 12px rgba(255, 40, 40, 0.15);
   opacity: 0;
   pointer-events: none;
-  transition: none;
 }
 
 .gender-modal-error-text.active {
@@ -93,7 +92,6 @@
 }
 
 .gender-modal-ok {
-  align-self: flex-end;
   font-family: monospace;
   font-size: 0.8rem;
   font-weight: 700;
@@ -305,7 +303,6 @@
   letter-spacing: 0.04em;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
-
 
 /* === Gallery === */
 .ref-gallery {
