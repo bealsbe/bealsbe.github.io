@@ -25,7 +25,7 @@ const BASE_SZ = 0.25;
 let ctx, W, H, cx, cy;
 let bitmaps = [];
 let sprites = [];
-let colorTime = 0;
+let colorTime = 0.5;
 
 function randomSprite(spreadZ) {
   return {
@@ -49,11 +49,13 @@ function resetSprite(s, spreadZ) {
 function draw() {
   ctx.clearRect(0, 0, W, H);
 
-  colorTime += 1 / 900;
+  colorTime += 1 / 1400;
   const cyclePos  = colorTime % BG_COLORS.length;
   const idx       = Math.floor(cyclePos);
   const t         = cyclePos - idx;
-  const intensity = Math.sin(t * Math.PI) * 0.14;
+  const pulseWindow = 0.38;
+  const pulse     = t < pulseWindow ? Math.sin((t / pulseWindow) * Math.PI) : 0;
+  const intensity = pulse * 0.22;
   const [r, g, b] = BG_COLORS[idx % BG_COLORS.length];
 
   ctx.fillStyle = `rgb(${Math.round(10 + r * intensity)}, ${Math.round(10 + g * intensity)}, ${Math.round(18 + b * intensity)})`;

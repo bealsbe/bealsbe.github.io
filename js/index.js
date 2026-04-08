@@ -7,18 +7,40 @@ tip.textContent = 'Art by Silvixen';
 document.body.appendChild(tip);
 
 let avatarTipTimeout;
-document.body.addEventListener('click', e => {
-  const link = e.target.closest('.avatar-link');
-  if (!link) {
-    tip.classList.remove('visible');
-    return;
-  }
+
+function showAvatarTip(link) {
   const r = link.getBoundingClientRect();
   tip.style.left = (r.left + r.width / 2) + 'px';
   tip.style.top  = (r.top - 36) + 'px';
   tip.classList.add('visible');
   clearTimeout(avatarTipTimeout);
-  avatarTipTimeout = setTimeout(() => tip.classList.remove('visible'), 2500);
+}
+
+function hideAvatarTip() {
+  clearTimeout(avatarTipTimeout);
+  avatarTipTimeout = setTimeout(() => tip.classList.remove('visible'), 300);
+}
+
+// hover (desktop)
+document.body.addEventListener('mouseover', e => {
+  const link = e.target.closest('.avatar-link');
+  if (link) showAvatarTip(link);
+});
+
+document.body.addEventListener('mouseout', e => {
+  if (e.target.closest('.avatar-link')) hideAvatarTip();
+});
+
+// click/tap (mobile + dismiss on click elsewhere)
+document.body.addEventListener('click', e => {
+  const link = e.target.closest('.avatar-link');
+  if (link) {
+    showAvatarTip(link);
+    clearTimeout(avatarTipTimeout);
+    avatarTipTimeout = setTimeout(() => tip.classList.remove('visible'), 2500);
+  } else {
+    tip.classList.remove('visible');
+  }
 });
 
 // --- Toast ---
@@ -219,6 +241,171 @@ discordOverlay.addEventListener('click', e => {
   });
 })();
 
+// --- Gallery lightbox ---
+(function () {
+  const overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.innerHTML = `
+    <button class="lightbox-prev" aria-label="Previous">&#8592;</button>
+    <div class="lightbox-card">
+      <button class="lightbox-close" aria-label="Close">&times;</button>
+      <div class="lightbox-stage">
+        <img class="lightbox-img" src="" alt="">
+      </div>
+      <div class="lightbox-footer">
+        <span class="lightbox-artist"></span>
+        <div class="lightbox-dots"></div>
+        <a class="lightbox-download" download>[ Download ]</a>
+      </div>
+    </div>
+    <button class="lightbox-next" aria-label="Next">&#8594;</button>
+  `;
+  document.body.appendChild(overlay);
+
+  const card     = overlay.querySelector('.lightbox-card');
+  const img      = overlay.querySelector('.lightbox-img');
+  const closeBtn = overlay.querySelector('.lightbox-close');
+  const prevBtn  = overlay.querySelector('.lightbox-prev');
+  const nextBtn  = overlay.querySelector('.lightbox-next');
+  const artist   = overlay.querySelector('.lightbox-artist');
+  const dotsEl   = overlay.querySelector('.lightbox-dots');
+  const download = overlay.querySelector('.lightbox-download');
+
+  let items = [];
+  let currentIdx = 0;
+  let resizeTimer = null;
+
+  function getItems() {
+    return Array.from(document.querySelectorAll('.gallery-item'));
+  }
+
+  function showItem(idx, direction) {
+    const item = items[idx];
+    if (!item) return;
+    currentIdx = idx;
+
+    // Update metadata immediately (doesn't depend on image load)
+    artist.textContent = item.dataset.artist ? `Art by ${item.dataset.artist}` : '';
+    download.href = item.href;
+    download.download = item.href.split('/').pop();
+    dotsEl.querySelectorAll('.lightbox-dot').forEach((d, i) => {
+      d.classList.toggle('active', i === idx);
+    });
+
+    if (!direction) {
+      // Initial open — just set src, card springs in at natural size
+      img.src = item.href;
+      img.alt = item.querySelector('img')?.alt || '';
+      return;
+    }
+
+    // Preload the target image so the resize measurement is synchronous
+    const probe = new Image();
+    const doTransition = () => {
+      const r = card.getBoundingClientRect();
+
+      // Measure the new card size with the incoming image
+      card.style.width  = r.width  + 'px';
+      card.style.height = r.height + 'px';
+      const oldSrc = img.src;
+      const oldAlt = img.alt;
+      img.src = item.href;
+      img.alt = item.querySelector('img')?.alt || '';
+      card.style.width  = '';
+      card.style.height = '';
+      const nw = card.offsetWidth;
+      const nh = card.offsetHeight;
+
+      const shrinking = nw < r.width || nh < r.height;
+
+      if (shrinking) {
+        // Restore old image, shrink card first so it clips the old image,
+        // then swap once the card has settled at the new size
+        img.src = oldSrc;
+        img.alt = oldAlt;
+        card.style.width  = r.width  + 'px';
+        card.style.height = r.height + 'px';
+        void card.offsetWidth;
+        card.style.width  = nw + 'px';
+        card.style.height = nh + 'px';
+
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          img.src = item.href;
+          img.alt = item.querySelector('img')?.alt || '';
+          card.style.width  = '';
+          card.style.height = '';
+        }, 280);
+      } else {
+        // Growing: swap image immediately, card expands to reveal it
+        card.style.width  = r.width  + 'px';
+        card.style.height = r.height + 'px';
+        void card.offsetWidth;
+        card.style.width  = nw + 'px';
+        card.style.height = nh + 'px';
+
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+          card.style.width  = '';
+          card.style.height = '';
+        }, 280);
+      }
+    };
+
+    probe.src = item.href;
+    if (probe.complete) {
+      doTransition();         // already cached — run immediately, no delay
+    } else {
+      probe.onload = doTransition;  // wait for network, then run
+    }
+  }
+
+  function openLightbox(item) {
+    items = getItems();
+    currentIdx = items.indexOf(item);
+
+    // Preload all gallery images in the background so cycling is instant
+    items.forEach(it => { new Image().src = it.href; });
+
+    dotsEl.innerHTML = '';
+    const multi = items.length > 1;
+    prevBtn.style.display = multi ? '' : 'none';
+    nextBtn.style.display = multi ? '' : 'none';
+    if (multi) {
+      items.forEach((_, i) => {
+        const dot = document.createElement('span');
+        dot.className = 'lightbox-dot' + (i === currentIdx ? ' active' : '');
+        dotsEl.appendChild(dot);
+      });
+    }
+
+    showItem(currentIdx);
+    overlay.classList.add('visible');
+  }
+
+  function closeLightbox() {
+    overlay.classList.remove('visible');
+  }
+
+  closeBtn.addEventListener('click', closeLightbox);
+  prevBtn.addEventListener('click', () => showItem((currentIdx - 1 + items.length) % items.length, -1));
+  nextBtn.addEventListener('click', () => showItem((currentIdx + 1) % items.length, 1));
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeLightbox(); });
+  document.addEventListener('keydown', e => {
+    if (!overlay.classList.contains('visible')) return;
+    if (e.key === 'Escape')      { closeLightbox(); return; }
+    if (e.key === 'ArrowRight')  { showItem((currentIdx + 1) % items.length, 1);  return; }
+    if (e.key === 'ArrowLeft')   { showItem((currentIdx - 1 + items.length) % items.length, -1); return; }
+  });
+
+  document.body.addEventListener('click', e => {
+    const item = e.target.closest('.gallery-item');
+    if (!item) return;
+    e.preventDefault();
+    openLightbox(item);
+  });
+})();
+
 // --- Hex swatch copy ---
 function copyHex(btn, hex) {
   navigator.clipboard.writeText(hex);
@@ -289,7 +476,7 @@ window.addEventListener('load', async () => {
   const SPREAD  = 1800;
   const BASE_SZ = 0.25;
 
-  let colorTime = 0;
+  let colorTime = 0.5;
   const sprites = [];
 
   function randomSprite(spreadZ) {
@@ -307,11 +494,13 @@ window.addEventListener('load', async () => {
   function draw() {
     ctx.clearRect(0, 0, W, H);
 
-    colorTime += 1 / 900;
+    colorTime += 1 / 1400;
     const cyclePos  = colorTime % BG_COLORS.length;
     const idx       = Math.floor(cyclePos);
     const t         = cyclePos - idx;
-    const intensity = Math.sin(t * Math.PI) * 0.14;
+    const pulseWindow = 0.38;
+    const pulse     = t < pulseWindow ? Math.sin((t / pulseWindow) * Math.PI) : 0;
+    const intensity = pulse * 0.22;
     const [r, g, b] = BG_COLORS[idx % BG_COLORS.length];
 
     ctx.fillStyle = `rgb(${Math.round(10 + r * intensity)}, ${Math.round(10 + g * intensity)}, ${Math.round(18 + b * intensity)})`;

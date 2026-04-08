@@ -7,7 +7,7 @@ Source: https://github.com/Purpzie/sucks
 /* === Variables === */
 :root {
   --accent: #FF6D00;
-  --card-bg: rgba(10, 10, 18, 0.12);
+  --card-bg: rgba(10, 10, 18, 0.52);
   --card-border: rgba(255, 109, 0, 0.85);
   --text: #ffffff;
   --text-muted: rgba(255, 255, 255, 0.88);
@@ -137,8 +137,8 @@ main {
   max-width: 860px;
   margin: auto;
   background: var(--card-bg);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--card-border);
   border-radius: 20px;
   padding: 36px 28px 32px;

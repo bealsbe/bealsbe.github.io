@@ -57,6 +57,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // resolve against the correct base URL (not the previous page's URL).
     if (pushState) history.pushState({ absUrl }, '', absUrl);
 
+    // Inject any stylesheets the new page needs that aren't already loaded
+    const existingHrefs = new Set(
+      Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(l => l.href)
+    );
+    newDoc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
+      if (!existingHrefs.has(link.href)) {
+        document.head.appendChild(document.adoptNode(link));
+      }
+    });
+
     // Remove page-exit before inserting new card so it only gets card-enter
     document.body.classList.remove('page-exit');
 
