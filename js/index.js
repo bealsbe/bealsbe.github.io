@@ -304,52 +304,31 @@ discordOverlay.addEventListener('click', e => {
     const doTransition = () => {
       const r = card.getBoundingClientRect();
 
-      // Measure the new card size with the incoming image
+      // Measure new dimensions, swap image, swipe and resize simultaneously
       card.style.width  = r.width  + 'px';
       card.style.height = r.height + 'px';
-      const oldSrc = img.src;
-      const oldAlt = img.alt;
       img.src = item.href;
       img.alt = item.querySelector('img')?.alt || '';
       card.style.width  = '';
       card.style.height = '';
       const nw = card.offsetWidth;
       const nh = card.offsetHeight;
+      card.style.width  = r.width  + 'px';
+      card.style.height = r.height + 'px';
+      void card.offsetWidth;
+      card.style.width  = nw + 'px';
+      card.style.height = nh + 'px';
 
-      const shrinking = nw < r.width || nh < r.height;
+      img.classList.remove('swipe-left', 'swipe-right');
+      requestAnimationFrame(() => {
+        img.classList.add(direction > 0 ? 'swipe-right' : 'swipe-left');
+      });
 
-      if (shrinking) {
-        // Restore old image, shrink card first so it clips the old image,
-        // then swap once the card has settled at the new size
-        img.src = oldSrc;
-        img.alt = oldAlt;
-        card.style.width  = r.width  + 'px';
-        card.style.height = r.height + 'px';
-        void card.offsetWidth;
-        card.style.width  = nw + 'px';
-        card.style.height = nh + 'px';
-
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          img.src = item.href;
-          img.alt = item.querySelector('img')?.alt || '';
-          card.style.width  = '';
-          card.style.height = '';
-        }, 280);
-      } else {
-        // Growing: swap image immediately, card expands to reveal it
-        card.style.width  = r.width  + 'px';
-        card.style.height = r.height + 'px';
-        void card.offsetWidth;
-        card.style.width  = nw + 'px';
-        card.style.height = nh + 'px';
-
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-          card.style.width  = '';
-          card.style.height = '';
-        }, 280);
-      }
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        card.style.width  = '';
+        card.style.height = '';
+      }, 280);
     };
 
     probe.src = item.href;
@@ -385,12 +364,26 @@ discordOverlay.addEventListener('click', e => {
 
   function closeLightbox() {
     overlay.classList.remove('visible');
+    card.style.width  = '';
+    card.style.height = '';
   }
 
   closeBtn.addEventListener('click', closeLightbox);
   prevBtn.addEventListener('click', () => showItem((currentIdx - 1 + items.length) % items.length, -1));
   nextBtn.addEventListener('click', () => showItem((currentIdx + 1) % items.length, 1));
   overlay.addEventListener('click', e => { if (e.target === overlay) closeLightbox(); });
+
+  // Touch swipe
+  let touchStartX = 0;
+  overlay.addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+  overlay.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) < 40) return; // ignore taps
+    if (dx < 0) showItem((currentIdx + 1) % items.length, 1);
+    else         showItem((currentIdx - 1 + items.length) % items.length, -1);
+  }, { passive: true });
   document.addEventListener('keydown', e => {
     if (!overlay.classList.contains('visible')) return;
     if (e.key === 'Escape')      { closeLightbox(); return; }

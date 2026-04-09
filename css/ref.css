@@ -382,13 +382,13 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.85);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   z-index: 2000;
   opacity: 0;
   pointer-events: none;
   transition: opacity 300ms ease;
-  padding: 24px;
+  padding: 24px 24px 80px;
 }
 
 .lightbox-overlay.visible {
@@ -410,7 +410,7 @@
   flex-direction: column;
   transform: scale(0.92);
   opacity: 0;
-  transition: width 260ms ease, height 260ms ease,
+  transition: width 260ms ease-out, height 260ms ease-out,
               transform 350ms cubic-bezier(0.34, 1.15, 0.64, 1), opacity 280ms ease;
 }
 
@@ -435,6 +435,21 @@
   width: auto;
   height: auto;
   object-fit: contain;
+}
+
+@keyframes lb-swipe-from-right {
+  from { transform: translateX(20px); }
+  to   { transform: translateX(0); }
+}
+@keyframes lb-swipe-from-left {
+  from { transform: translateX(-20px); }
+  to   { transform: translateX(0); }
+}
+.lightbox-img.swipe-right {
+  animation: lb-swipe-from-right 260ms ease-out both;
+}
+.lightbox-img.swipe-left {
+  animation: lb-swipe-from-left 260ms ease-out both;
 }
 
 
@@ -464,6 +479,11 @@
 
 .lightbox-prev { left: 20px; }
 .lightbox-next { right: 20px; }
+
+@media (hover: none) and (pointer: coarse) {
+  .lightbox-prev,
+  .lightbox-next { display: none; }
+}
 
 .lightbox-prev:hover,
 .lightbox-next:hover {
