@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Beals — Character Ref</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../css/style.css">
     <link rel="stylesheet" href="../css/ref.css">
@@ -54,14 +56,17 @@
 
           <div class="ref-gallery">
             <a href="../img/ref/inferaltee.jpg" class="gallery-item gallery-item--full" data-artist="InferalTee">
-              <img src="../img/ref/inferaltee.jpg" alt="Reference sheet">
+              <img src="../img/ref/inferaltee.jpg" alt="Reference sheet" loading="lazy">
             </a>
             <div class="gallery-row">
-              <a href="../img/ref/feve.png" class="gallery-item" data-artist="Feve">
-                <img src="../img/ref/feve.png" alt="Headshot">
+              <a href="../img/ref/feve.webp" class="gallery-item" data-artist="Feve">
+                <picture>
+                  <source srcset="../img/ref/feve.webp" type="image/webp">
+                  <img src="../img/ref/feve.png" alt="Headshot" loading="lazy">
+                </picture>
               </a>
-              <a href="../img/ref/roombakittens.png" class="gallery-item" data-artist="RoombaKittens">
-                <img src="../img/ref/roombakittens_thumb.png" alt="Character art">
+              <a href="../img/ref/roombakittens.webp" class="gallery-item" data-artist="RoombaKittens">
+                <img src="../img/ref/roombakittens_thumb.png" alt="Character art" loading="lazy">
               </a>
             </div>
           </div>
@@ -72,12 +77,12 @@
     <canvas></canvas>
 
     <div class="images">
-      <img id="img-merp1" src="../img/merp1.png">
-      <img id="img-merp2" src="../img/merp2.png">
-      <img id="img-bealsonwheels" src="../img/bealsonwheels.png">
+      <picture><source srcset="../img/merp1.webp" type="image/webp"><img id="img-merp1" src="../img/merp1.png"></picture>
+      <picture><source srcset="../img/merp2.webp" type="image/webp"><img id="img-merp2" src="../img/merp2.png"></picture>
+      <picture><source srcset="../img/bealsonwheels.webp" type="image/webp"><img id="img-bealsonwheels" src="../img/bealsonwheels.png"></picture>
     </div>
 
-<script src="../js/index.js"></script>
-    <script src="../js/transitions.js"></script>
+<script src="../js/index.js" defer></script>
+    <script src="../js/transitions.js" defer></script>
   </body>
 </html>

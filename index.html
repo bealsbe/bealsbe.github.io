@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Beals</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/ref.css">
@@ -18,7 +20,10 @@
       <div class="profile-card">
         <div class="profile-header">
           <div class="avatar-link">
-            <img src="img/icon.png" alt="Beals" class="avatar">
+            <picture>
+              <source srcset="img/icon.webp" type="image/webp">
+              <img src="img/icon.png" alt="Beals" class="avatar">
+            </picture>
           </div>
           <div class="profile-text">
             <h1 class="name">Beals</h1>
@@ -74,12 +79,12 @@
     <canvas></canvas>
 
     <div class="images">
-      <img id="img-merp1" src="img/merp1.png">
-      <img id="img-merp2" src="img/merp2.png">
-      <img id="img-bealsonwheels" src="img/bealsonwheels.png">
+      <picture><source srcset="img/merp1.webp" type="image/webp"><img id="img-merp1" src="img/merp1.png"></picture>
+      <picture><source srcset="img/merp2.webp" type="image/webp"><img id="img-merp2" src="img/merp2.png"></picture>
+      <picture><source srcset="img/bealsonwheels.webp" type="image/webp"><img id="img-bealsonwheels" src="img/bealsonwheels.png"></picture>
     </div>
 
-    <script src="js/index.js"></script>
-    <script src="js/transitions.js"></script>
+    <script src="js/index.js" defer></script>
+    <script src="js/transitions.js" defer></script>
   </body>
 </html>

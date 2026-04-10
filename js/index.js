@@ -1,5 +1,8 @@
 'use strict';
 
+// Single body click dispatcher — all handlers register here, one listener fires them
+const _clicks = [];
+
 // --- Avatar tip ---
 const tip = document.createElement('div');
 tip.id = 'avatar-tip';
@@ -32,7 +35,7 @@ document.body.addEventListener('mouseout', e => {
 });
 
 // click/tap (mobile + dismiss on click elsewhere)
-document.body.addEventListener('click', e => {
+_clicks.push(e => {
   const link = e.target.closest('.avatar-link');
   if (link) {
     showAvatarTip(link);
@@ -72,7 +75,7 @@ const discordClose = discordOverlay.querySelector('.discord-modal-close');
 function openDiscordModal()  { discordOverlay.classList.add('visible'); }
 function closeDiscordModal() { discordOverlay.classList.remove('visible'); }
 
-document.body.addEventListener('click', e => {
+_clicks.push(e => {
   if (e.target.closest('#discord-btn')) {
     e.preventDefault();
     navigator.clipboard?.writeText('beals');
@@ -84,6 +87,32 @@ document.body.addEventListener('click', e => {
 discordClose.addEventListener('click', closeDiscordModal);
 discordOverlay.addEventListener('click', e => {
   if (e.target === discordOverlay) closeDiscordModal();
+});
+
+// --- Button ripple + deferred navigation ---
+document.querySelectorAll('.link-btn').forEach(btn => {
+  if (btn.id === 'discord-btn') return;
+  btn.addEventListener('click', function(e) {
+    const href = this.href;
+    if (!href) return;
+    e.preventDefault();
+
+    const rect = this.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 2.5;
+    const ripple = document.createElement('span');
+    ripple.className = 'btn-ripple';
+    ripple.style.width  = size + 'px';
+    ripple.style.height = size + 'px';
+    ripple.style.left   = (e.clientX - rect.left - size / 2) + 'px';
+    ripple.style.top    = (e.clientY - rect.top  - size / 2) + 'px';
+    this.appendChild(ripple);
+
+    const target = this.target;
+    setTimeout(() => {
+      ripple.remove();
+      target === '_blank' ? window.open(href, '_blank') : (window.location.href = href);
+    }, 280);
+  });
 });
 
 // --- Gender boot sequence modal ---
@@ -236,9 +265,7 @@ discordOverlay.addEventListener('click', e => {
 
   okBtn.addEventListener('click', closeModal);
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-  document.body.addEventListener('click', e => {
-    if (e.target.closest('.error-badge')) openModal();
-  });
+  _clicks.push(e => { if (e.target.closest('.error-badge')) openModal(); });
 })();
 
 // --- Gallery lightbox ---
@@ -391,7 +418,7 @@ discordOverlay.addEventListener('click', e => {
     if (e.key === 'ArrowLeft')   { showItem((currentIdx - 1 + items.length) % items.length, -1); return; }
   });
 
-  document.body.addEventListener('click', e => {
+  _clicks.push(e => {
     const item = e.target.closest('.gallery-item');
     if (!item) return;
     e.preventDefault();
@@ -409,6 +436,9 @@ function copyHex(btn, hex) {
   setTimeout(() => { span.textContent = prev; btn.style.opacity = ''; }, 1200);
 }
 
+// --- Single body click dispatcher ---
+document.body.addEventListener('click', e => { for (const fn of _clicks) fn(e); });
+
 const cnvs   = document.querySelector('canvas');
 const imgEls = Array.from(document.querySelectorAll('.images img'));
 
@@ -425,8 +455,16 @@ window.addEventListener('load', async () => {
         [offscreen, ...bitmaps]
       );
 
+      let workerResizeTimer;
       window.addEventListener('resize', () => {
-        worker.postMessage({ type: 'resize', width: innerWidth, height: innerHeight });
+        clearTimeout(workerResizeTimer);
+        workerResizeTimer = setTimeout(() => {
+          worker.postMessage({ type: 'resize', width: innerWidth, height: innerHeight });
+        }, 60);
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        worker.postMessage({ type: document.hidden ? 'pause' : 'resume' });
       });
 
       return; // worker owns the canvas from here
@@ -438,15 +476,22 @@ window.addEventListener('load', async () => {
   // --- Main-thread fallback ---
   const ctx = cnvs.getContext('2d');
   let W, H, cx, cy;
+  let connectDistSq = 0; // opt 4 — declared here so resize() can write to it immediately
 
   function resize() {
     W = cnvs.width  = innerWidth;
     H = cnvs.height = innerHeight;
     cx = W / 2;
     cy = H / 2;
+    const d = Math.min(220, Math.min(W, H) * 0.26);
+    connectDistSq = d * d;
   }
   resize();
-  window.addEventListener('resize', resize);
+  let fbResizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(fbResizeTimer);
+    fbResizeTimer = setTimeout(resize, 60);
+  });
 
   const BG_COLORS_SRC = [
     [  0, 180, 150],
@@ -462,18 +507,52 @@ window.addEventListener('load', async () => {
     [BG_COLORS[i], BG_COLORS[j]] = [BG_COLORS[j], BG_COLORS[i]];
   }
 
-  const COUNT      = 30;
-  const STAR_COUNT = 80;
-  const FOCAL      = 320;
-  const Z_FAR      = 2000;
-  const Z_NEAR     = 60;
-  const SPREAD     = 1800;
-  const BASE_SZ    = 0.25;
+  const COUNT        = 6;
+  const STAR_COUNT   = 15;
+  const FOCAL        = 320;
+  const Z_FAR        = 2000;
+  const Z_NEAR       = 60;
+  const SPREAD       = 1800;
+  const BASE_SZ      = 0.18;
+  const N_CLUSTERS  = 3;
+  const MIN_CLUSTER = 3;
 
   let colorTime   = 0.5;
   let colorFadeIn = 0;
   const sprites = [];
   const stars   = [];
+
+  const FRAME_MS = 1000 / 30;
+  let lastFrame  = 0;
+  let rafId      = 0;
+
+  let clusterCenters  = [];
+  let starAssignments = [];
+  function initClusters() {
+    clusterCenters = [];
+    for (let i = 0; i < N_CLUSTERS; i++) {
+      clusterCenters.push({
+        sx:     (Math.random() - 0.5) * W * 0.6,
+        sy:     (Math.random() - 0.5) * H * 0.6,
+        spread: 150 + Math.random() * 150,
+      });
+    }
+    const maxOrphans = MIN_CLUSTER - 1;
+    const orphans    = Math.floor(Math.random() * (maxOrphans + 1));
+    const assigned   = STAR_COUNT - orphans;
+    starAssignments  = [];
+    for (let i = 0; i < N_CLUSTERS; i++)
+      for (let j = 0; j < MIN_CLUSTER; j++)
+        starAssignments.push(i);
+    for (let i = N_CLUSTERS * MIN_CLUSTER; i < assigned; i++)
+      starAssignments.push(Math.floor(Math.random() * N_CLUSTERS));
+    for (let i = 0; i < orphans; i++)
+      starAssignments.push(-1);
+    for (let i = starAssignments.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [starAssignments[i], starAssignments[j]] = [starAssignments[j], starAssignments[i]];
+    }
+  }
 
   function randomSprite(spreadZ) {
     const speed = Math.random() * 0.5 + 0.2;
@@ -487,26 +566,39 @@ window.addEventListener('load', async () => {
     return { x: sx * z / FOCAL, y: sy * z / FOCAL, z, speed, img };
   }
 
-  function randomStar(spreadZ) {
+  function randomStar(spreadZ, cluster) {
     const speed      = Math.random() * 0.04 + 0.01;
     const size       = Math.random() * 1.2 + 0.4;
     const phase      = Math.random() * Math.PI * 2;
     const twinkleSpd = Math.random() * 30 + 15;
-    if (!spreadZ) {
-      return { x: (Math.random() - 0.5) * SPREAD * 1.4, y: (Math.random() - 0.5) * SPREAD * 1.4, z: Z_FAR, speed, size, phase, twinkleSpd, fadeIn: 1 };
+    const z = spreadZ
+      ? Z_NEAR * 3 + Math.random() * (Z_FAR * 0.85 - Z_NEAR * 3)
+      : Z_FAR;
+    let targetSx, targetSy;
+    if (cluster === -1) {
+      targetSx = (Math.random() - 0.5) * W;
+      targetSy = (Math.random() - 0.5) * H;
+    } else {
+      const c  = clusterCenters[cluster];
+      targetSx = c.sx + (Math.random() - 0.5) * c.spread;
+      targetSy = c.sy + (Math.random() - 0.5) * c.spread;
     }
-    const z  = Z_NEAR * 3 + Math.random() * (Z_FAR * 0.85 - Z_NEAR * 3);
-    const sx = (Math.random() - 0.5) * W;
-    const sy = (Math.random() - 0.5) * H;
-    return { x: sx * z / FOCAL, y: sy * z / FOCAL, z, speed, size, phase, twinkleSpd, fadeIn: 1 };
+    return { x: targetSx * z / FOCAL, y: targetSy * z / FOCAL, z, speed, size, phase, twinkleSpd, fadeIn: 1, cluster };
   }
 
   function resetStar(s) {
-    s.z          = Z_NEAR * 3 + Math.random() * (Z_FAR * 0.85 - Z_NEAR * 3);
-    const sx     = (Math.random() - 0.5) * W;
-    const sy     = (Math.random() - 0.5) * H;
-    s.x          = sx * s.z / FOCAL;
-    s.y          = sy * s.z / FOCAL;
+    s.z = Z_NEAR * 3 + Math.random() * (Z_FAR * 0.85 - Z_NEAR * 3);
+    let targetSx, targetSy;
+    if (s.cluster === -1) {
+      targetSx = (Math.random() - 0.5) * W;
+      targetSy = (Math.random() - 0.5) * H;
+    } else {
+      const c  = clusterCenters[s.cluster];
+      targetSx = c.sx + (Math.random() - 0.5) * c.spread;
+      targetSy = c.sy + (Math.random() - 0.5) * c.spread;
+    }
+    s.x          = targetSx * s.z / FOCAL;
+    s.y          = targetSy * s.z / FOCAL;
     s.speed      = Math.random() * 0.04 + 0.01;
     s.size       = Math.random() * 1.2 + 0.4;
     s.phase      = Math.random() * Math.PI * 2;
@@ -514,12 +606,34 @@ window.addEventListener('load', async () => {
     s.fadeIn     = 0;
   }
 
+  initClusters();
   for (let i = 0; i < COUNT; i++) sprites.push(randomSprite(true));
-  for (let i = 0; i < STAR_COUNT; i++) stars.push(randomStar(true));
+  for (let i = 0; i < STAR_COUNT; i++) stars.push(randomStar(true, starAssignments[i]));
 
-  const lineAlphas = new Map();
+  const lineAlphas  = new Map();
+
+  // Pre-allocated frame temporaries — cleared each frame, never re-created (opt 2)
+  const starDraws   = [];
+  const lineDraws   = [];
+  const adj         = new Map();
+  const visited     = new Set();
+  const activeEdges = new Set();
+  const component   = [];
+  const queue       = [];
+
+  // Object pools — reused each frame, no per-frame allocation (opt 1)
+  const starPool = Array.from({length: STAR_COUNT},     () => ({sx: 0, sy: 0, r: 0, alpha: 0}));
+  const linePool = Array.from({length: STAR_COUNT * 4}, () => ({x1: 0, y1: 0, x2: 0, y2: 0, alpha: 0}));
+  // Adjacency list pool — inner arrays reused, not recreated (opt 2)
+  const adjPool  = Array.from({length: STAR_COUNT}, () => []);
+  let adjPoolIdx = 0;
+
+  // BFS read-head — avoids queue.shift() O(n) cost (opt 3)
+  let qHead = 0;
 
   function draw() {
+    rafId = requestAnimationFrame(draw);
+
     ctx.clearRect(0, 0, W, H);
 
     colorFadeIn = Math.min(1, colorFadeIn + 1 / 1800);
@@ -537,11 +651,17 @@ window.addEventListener('load', async () => {
 
     sprites.sort((a, b) => b.z - a.z);
 
+    let lastAlpha = -1;
     for (const s of sprites) {
       s.speed += 0.002;
       s.z -= s.speed;
 
       if (s.z <= Z_NEAR) { Object.assign(s, randomSprite(false)); continue; }
+
+      const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
+      const tNear = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
+      const alpha = tFar * tNear;
+      if (alpha < 0.05) continue;
 
       const scale = (FOCAL / s.z) * BASE_SZ;
       const sx    = cx + (s.x / s.z) * FOCAL;
@@ -553,15 +673,16 @@ window.addEventListener('load', async () => {
         Object.assign(s, randomSprite(false)); continue;
       }
 
-      const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
-      const tNear = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, tFar * tNear);
+      if (Math.abs(alpha - lastAlpha) > 0.02) {
+        ctx.globalAlpha = alpha;
+        lastAlpha = alpha;
+      }
       ctx.drawImage(s.img, sx - w / 2, sy - h / 2, w, h);
-      ctx.restore();
     }
 
-    const starDraws = [];
+    // Stars — fill pool objects in-place, no per-frame allocation (opt 1, opt 5)
+    starDraws.length = 0;
+    let starPoolIdx = 0;
     for (const s of stars) {
       s.speed += 0.0002;
       s.z -= s.speed;
@@ -574,15 +695,19 @@ window.addEventListener('load', async () => {
 
       if (sx < 0 || sx > W || sy < 0 || sy > H) { resetStar(s); continue; }
 
-      s.fadeIn = Math.min(1, (s.fadeIn ?? 1) + 0.008);
+      s.fadeIn = Math.min(1, s.fadeIn + 0.008); // opt 5: fadeIn always set, ?? 1 removed
       const tFar    = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
       const tNear   = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
       const twinkle = 0.7 + 0.3 * Math.sin(colorTime * s.twinkleSpd + s.phase);
       const alpha   = Math.max(0, tFar * tNear * twinkle * s.fadeIn);
-      const r       = Math.max(0.3, s.size * (FOCAL / s.z));
+      const rr      = Math.max(0.3, s.size * (FOCAL / s.z));
 
       s.sx = sx; s.sy = sy; s.alpha = alpha;
-      if (alpha > 0) starDraws.push({ sx, sy, r, alpha });
+      if (alpha >= 0.05) {
+        const d = starPool[starPoolIdx++];
+        d.sx = sx; d.sy = sy; d.r = rr; d.alpha = alpha;
+        starDraws.push(d);
+      }
     }
 
     starDraws.sort((a, b) => a.alpha - b.alpha);
@@ -600,37 +725,37 @@ window.addEventListener('load', async () => {
       ctx.fill();
     }
 
-    // Build adjacency from screen-space proximity
-    const CONNECT_DIST_SQ = 160 * 160;
+    // Build adjacency — cached connectDistSq (opt 4), pooled inner arrays (opt 2)
     const FADE_IN  = 0.018;
     const FADE_OUT = 0.007;
-    const adj = new Map();
+    adj.clear();
+    adjPoolIdx = 0;
     for (let i = 0; i < stars.length; i++) {
       if (stars[i].sx == null) continue;
       for (let j = i + 1; j < stars.length; j++) {
         if (stars[j].sx == null) continue;
         const dx = stars[i].sx - stars[j].sx, dy = stars[i].sy - stars[j].sy;
-        if (dx * dx + dy * dy > CONNECT_DIST_SQ) continue;
-        if (!adj.has(i)) adj.set(i, []);
-        if (!adj.has(j)) adj.set(j, []);
+        if (dx * dx + dy * dy > connectDistSq) continue;
+        if (!adj.has(i)) { const a = adjPool[adjPoolIdx++]; a.length = 0; adj.set(i, a); }
+        if (!adj.has(j)) { const a = adjPool[adjPoolIdx++]; a.length = 0; adj.set(j, a); }
         adj.get(i).push(j);
         adj.get(j).push(i);
       }
     }
 
-    // BFS — only activate edges in components of size >= 3
-    const visited = new Set();
-    const activeEdges = new Set();
+    // BFS — index-based queue, no shift() (opt 3)
+    visited.clear();
+    activeEdges.clear();
     for (const start of adj.keys()) {
       if (visited.has(start)) continue;
-      const component = [], queue = [start];
-      while (queue.length) {
-        const node = queue.shift();
+      component.length = 0; queue.length = 0; qHead = 0; queue.push(start);
+      while (qHead < queue.length) {
+        const node = queue[qHead++];
         if (visited.has(node)) continue;
         visited.add(node); component.push(node);
         for (const nb of adj.get(node)) { if (!visited.has(nb)) queue.push(nb); }
       }
-      if (component.length >= 3 && component.length <= 6) {
+      if (component.length >= 3 && component.length <= 5) {
         for (const node of component)
           for (const nb of adj.get(node))
             if (nb > node) activeEdges.add(node * STAR_COUNT + nb);
@@ -646,24 +771,47 @@ window.addEventListener('load', async () => {
     }
     for (const key of activeEdges) lineAlphas.set(key, FADE_IN);
 
-    // Draw lines
-    ctx.lineWidth = 0.5;
-    ctx.strokeStyle = '#ffffff';
+    // Draw lines — pool objects, batch by alpha (opt 1)
+    lineDraws.length = 0;
+    let linePoolIdx = 0;
     for (const [key, lineAlpha] of lineAlphas) {
       const ai = (key / STAR_COUNT) | 0, bi = key % STAR_COUNT;
       const a = stars[ai], b = stars[bi];
       if (!a || !b || a.sx == null || b.sx == null) { lineAlphas.delete(key); continue; }
-      ctx.globalAlpha = Math.min(a.alpha, b.alpha) * lineAlpha * 0.25;
+      const alpha = Math.min(a.alpha, b.alpha) * lineAlpha * 0.35;
+      if (alpha > 0) {
+        const d = linePool[linePoolIdx++];
+        d.x1 = a.sx; d.y1 = a.sy; d.x2 = b.sx; d.y2 = b.sy; d.alpha = alpha;
+        lineDraws.push(d);
+      }
+    }
+    lineDraws.sort((a, b) => a.alpha - b.alpha);
+    ctx.lineWidth = 0.7;
+    ctx.strokeStyle = '#ffffff';
+    let li = 0;
+    while (li < lineDraws.length) {
+      const baseAlpha = lineDraws[li].alpha;
+      ctx.globalAlpha = baseAlpha;
       ctx.beginPath();
-      ctx.moveTo(a.sx, a.sy);
-      ctx.lineTo(b.sx, b.sy);
+      while (li < lineDraws.length && lineDraws[li].alpha - baseAlpha < 0.04) {
+        const d = lineDraws[li++];
+        ctx.moveTo(d.x1, d.y1);
+        ctx.lineTo(d.x2, d.y2);
+      }
       ctx.stroke();
     }
 
     ctx.globalAlpha = 1;
-
-    requestAnimationFrame(draw);
   }
 
-  draw();
+  rafId = requestAnimationFrame(draw);
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      cancelAnimationFrame(rafId);
+      rafId = 0;
+    } else if (!rafId) {
+      rafId = requestAnimationFrame(draw);
+    }
+  });
 });
