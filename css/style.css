@@ -7,8 +7,8 @@ Source: https://github.com/Purpzie/sucks
 /* === Variables === */
 :root {
   --accent: #FF6D00;
-  --card-bg: rgba(10, 10, 18, 0.12);
-  --card-border: rgba(255, 109, 0, 0.85);
+  --card-bg: rgba(13, 13, 21, 0.94);
+  --card-border: rgba(255, 255, 255, 0.16);
   --text: #ffffff;
   --text-muted: rgba(255, 255, 255, 0.88);
 }
@@ -20,6 +20,8 @@ Source: https://github.com/Purpzie/sucks
 
 html {
   -webkit-overflow-scrolling: touch;
+  background: #0a0a12; /* sky base colour, shown until the canvas paints */
+  scrollbar-gutter: stable; /* the taller ref page adds a scrollbar; don't let it shift the layout */
 }
 
 html, body {
@@ -36,6 +38,7 @@ canvas {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100lvh; /* the large viewport doesn't change as a phone's address bar shows/hides */
   z-index: -1;
 }
 
@@ -44,47 +47,23 @@ canvas {
 }
 
 /* === Nav === */
+/* Plain text tabs sitting on the card's top edge; the current page gets an orange underline */
 .site-nav {
-  position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
-  gap: 4px;
-  background:
-    linear-gradient(160deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0.02) 40%,
-      transparent 65%
-    ),
-    rgba(10, 10, 18, 0.18);
-  backdrop-filter: blur(6px) saturate(120%);
-  -webkit-backdrop-filter: blur(6px) saturate(120%);
-  border: 1px solid var(--card-border);
-  border-radius: 100px;
-  padding: 6px;
-  z-index: 100;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.22) inset,
-    0 3px 12px rgba(0, 0, 0, 0.3);
-  transition: opacity 250ms ease, transform 250ms ease;
-}
-
-.site-nav.nav-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateX(-50%) translateY(-12px);
+  width: fit-content; /* only as wide as the tabs, so page switches move it without resizing it */
+  gap: 24px;
+  padding: 0 4px 12px;
 }
 
 .nav-link {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.875rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.6);
   text-decoration: none;
-  padding: 6px 16px;
-  border-radius: 100px;
-  transition: background 150ms ease, color 150ms ease;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  transition: color 150ms ease, border-color 150ms ease;
 }
 
 .nav-link:hover {
@@ -94,18 +73,13 @@ canvas {
 
 .nav-link.active {
   color: var(--text);
+  border-bottom-color: var(--accent);
 }
 
-/* Sliding pill (JS-driven) */
-.nav-pill {
-  position: absolute;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 100px;
-  pointer-events: none;
-  transition: left 260ms cubic-bezier(0.4, 0, 0.2, 1),
-              top 260ms cubic-bezier(0.4, 0, 0.2, 1),
-              width 260ms cubic-bezier(0.4, 0, 0.2, 1),
-              height 260ms cubic-bezier(0.4, 0, 0.2, 1);
+.nav-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 /* === Layout === */
@@ -114,57 +88,136 @@ main {
   min-height: 100dvh;
   display: flex;
   align-items: center;
-  padding: 80px 16px 32px;
+  padding: 40px 16px;
 }
 
-.ref-page main {
-  padding-top: 110px;
+/* Holds the nav and the card; matches the card's width so the tabs line up with its left edge */
+.shell {
+  width: 100%;
+  max-width: 860px;
+  margin: auto;
 }
-/* === Page transitions === */
+
+.shell:has(.ref-card) {
+  max-width: 960px;
+}
+
+/* === Page transitions ===
+   Three styles to compare; pick one by loading the site with ?t=morph, ?t=slide or ?t=fade.
+   morph and slide use the View Transitions API; browsers without it always get fade. */
 @keyframes card-enter {
-  from { opacity: 0; transform: translateY(12px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+  from { opacity: 0; transform: translateY(8px); }
 }
 
 @keyframes card-exit {
-  from { opacity: 1; transform: translateY(0)     scale(1);    }
-  to   { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to { opacity: 0; transform: translateY(-6px); }
 }
 
 .profile-card {
-  animation: card-enter 350ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: card-enter 260ms cubic-bezier(0.2, 0, 0, 1) both;
 }
 
 .page-exit .profile-card {
-  animation: card-exit 280ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation: card-exit 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+/* Cards swapped in by a view transition skip their own entrance */
+.profile-card.no-enter {
+  animation: none;
+}
+
+/* The sky keeps animating underneath; only the nav and card take part in the transition */
+:root {
+  view-transition-name: none;
+}
+
+.site-nav {
+  view-transition-name: site-nav;
+}
+
+.profile-card {
+  view-transition-name: card;
+}
+
+::view-transition-group(*) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+}
+
+/* The nav looks the same before and after (the underline has already moved), so slide one copy
+   instead of crossfading two; crossfading text makes it shimmer */
+::view-transition-old(site-nav) {
+  display: none;
+}
+
+::view-transition-new(site-nav) {
+  animation: none;
+}
+
+/* morph: the card frame resizes into the new page while its contents crossfade.
+   Snapshots keep their real size (no stretching) and are clipped to the moving frame. */
+html[data-vt="morph"]::view-transition-group(card) {
+  overflow: clip;
+}
+
+html[data-vt="morph"]::view-transition-old(card),
+html[data-vt="morph"]::view-transition-new(card) {
+  height: 100%;
+  object-fit: none;
+  object-position: 50% 0;
+}
+
+html[data-vt="morph"]::view-transition-old(card) {
+  animation: vt-fade-out 200ms ease-in both;
+}
+
+html[data-vt="morph"]::view-transition-new(card) {
+  animation: vt-fade-in 300ms 120ms ease-out both;
+}
+
+/* slide: Home -> Ref moves left, Ref -> Home moves right */
+html[data-vt="slide"]::view-transition-old(card) {
+  animation: vt-slide-out 220ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+html[data-vt="slide"]::view-transition-new(card) {
+  animation: vt-slide-in 360ms 60ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+html[data-vt="slide"]::view-transition-old(card),
+html[data-vt="slide"]::view-transition-new(card) {
+  height: 100%;
+  object-fit: none;
+  object-position: 50% 0;
+  --vt-dir: 1;
+}
+
+html[data-vt="slide"][data-vt-dir="back"]::view-transition-old(card),
+html[data-vt="slide"][data-vt-dir="back"]::view-transition-new(card) {
+  --vt-dir: -1;
+}
+
+@keyframes vt-fade-out { to { opacity: 0; } }
+@keyframes vt-fade-in { from { opacity: 0; } }
+@keyframes vt-slide-out { to { opacity: 0; transform: translateX(calc(var(--vt-dir) * -48px)); } }
+@keyframes vt-slide-in { from { opacity: 0; transform: translateX(calc(var(--vt-dir) * 48px)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-card,
+  .page-exit .profile-card {
+    animation: none;
+  }
 }
 
 /* === Profile card === */
 .profile-card {
   width: 100%;
-  max-width: 860px;
-  margin: auto;
-  background:
-    linear-gradient(160deg,
-      rgba(255, 255, 255, 0.05) 0%,
-      rgba(255, 255, 255, 0.01) 40%,
-      transparent 65%
-    ),
-    var(--card-bg);
-  backdrop-filter: blur(4px) saturate(120%);
-  -webkit-backdrop-filter: blur(4px) saturate(120%);
+  background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 20px;
+  border-radius: 0;
   padding: 36px 28px 32px;
   display: flex;
   flex-direction: column;
-  will-change: transform;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.30) inset,
-    inset 0 0 0 1px rgba(255, 255, 255, 0.07),
-    0 2px 6px rgba(0, 0, 0, 0.35),
-    0 12px 32px rgba(0, 0, 0, 0.4),
-    0 40px 80px rgba(0, 0, 0, 0.35);
 }
 
 /* === Profile header === */
@@ -210,10 +263,9 @@ main {
 .avatar {
   width: 130px;
   height: 130px;
-  border-radius: 14px;
+  border-radius: 0;
   object-fit: cover;
-  border: 2px solid var(--accent);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); /* subtle lift, no border */
   flex-shrink: 0;
 }
 
@@ -246,6 +298,10 @@ main {
   margin: 0;
 }
 
+.bio + .bio {
+  margin-top: 0.75em;
+}
+
 /* === Divider === */
 .divider {
   width: 100%;
@@ -267,7 +323,7 @@ main {
   align-items: center;
   width: 100%;
   padding: 16px 14px;
-  border-radius: 10px;
+  border-radius: 4px;
   text-decoration: none;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 0.95rem;
@@ -348,19 +404,22 @@ main {
   align-items: center;
   justify-content: center;
   opacity: 0;
+  visibility: hidden; /* fully off while closed, so its backdrop blur costs nothing during scrolling */
   pointer-events: none;
-  transition: opacity 300ms ease;
+  transition: opacity 300ms ease, visibility 0s linear 300ms;
 }
 
 .discord-overlay.visible {
   opacity: 1;
   pointer-events: all;
+  visibility: visible;
+  transition: opacity 300ms ease;
 }
 
 .discord-modal {
   background: rgba(10, 10, 18, 0.92);
   border: 1px solid rgba(88, 101, 242, 0.85);
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 28px 32px 24px;
   min-width: 260px;
   text-align: center;
@@ -438,6 +497,10 @@ main {
 
 /* === Mobile === */
 @media (max-width: 699px) {
+  .site-nav {
+    margin-inline: auto;
+  }
+
   .profile-card {
     padding: 24px 18px 20px;
   }

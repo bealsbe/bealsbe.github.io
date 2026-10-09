@@ -1,27 +1,14 @@
 'use strict';
 
-const BG_COLORS_SRC = [
-  [  0, 180, 150],  // teal
-  [ 20, 170,  90],  // green
-  [ 20, 150, 210],  // cyan
-  [110,  40, 210],  // purple
-  [ 40,  80, 220],  // deep blue
-  [190,  20, 150],  // magenta
-];
+const SKY = '#0a0a12'; // fixed background colour
 
-const BG_COLORS = [...BG_COLORS_SRC];
-for (let i = BG_COLORS.length - 1; i > 0; i--) {
-  const j = Math.floor(Math.random() * (i + 1));
-  [BG_COLORS[i], BG_COLORS[j]] = [BG_COLORS[j], BG_COLORS[i]];
-}
-
-const COUNT      = 6;
+const COUNT      = 8; // flying stickers on screen
 const STAR_COUNT = 15;
 const FOCAL      = 320;
 const Z_FAR      = 2000;
 const Z_NEAR     = 60;
-const SPREAD     = 1800;
-const BASE_SZ      = 0.18;
+const SPREAD     = 5600; // start wide so stickers clear the card sooner
+const BASE_SZ      = 0.30; // sticker size
 const N_CLUSTERS  = 3;
 const MIN_CLUSTER = 3; // min stars per cluster (also caps orphan count)
 
@@ -64,8 +51,7 @@ let ctx, W, H, cx, cy;
 let bitmaps = [];
 let sprites = [];
 let stars   = [];
-let colorTime   = 0.5;
-let colorFadeIn = 0;
+let twinkleTime   = 0.5;
 let lineAlphas  = new Map();
 
 const FRAME_MS = 1000 / 30;
@@ -163,17 +149,9 @@ function draw() {
 
   ctx.clearRect(0, 0, W, H);
 
-  colorFadeIn = Math.min(1, colorFadeIn + 1 / 1800);
-  colorTime += 1 / 1400;
-  const cyclePos    = colorTime % BG_COLORS.length;
-  const idx         = Math.floor(cyclePos);
-  const t           = cyclePos - idx;
-  const pulseWindow = 0.38;
-  const pulse       = t < pulseWindow ? Math.sin((t / pulseWindow) * Math.PI) : 0;
-  const intensity   = pulse * 0.12 * colorFadeIn;
-  const [r, g, b]   = BG_COLORS[idx % BG_COLORS.length];
+  twinkleTime += 1 / 1400;
 
-  ctx.fillStyle = `rgb(${Math.round(10 + r * intensity)}, ${Math.round(10 + g * intensity)}, ${Math.round(18 + b * intensity)})`;
+  ctx.fillStyle = SKY;
   ctx.fillRect(0, 0, W, H);
 
   sprites.sort((a, b) => b.z - a.z);
@@ -188,7 +166,7 @@ function draw() {
       continue;
     }
 
-    const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
+    const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.12)); // reach full opacity early
     const tNear = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
     const alpha = tFar * tNear;
     if (alpha < 0.05) continue;
@@ -231,7 +209,7 @@ function draw() {
     s.fadeIn = Math.min(1, s.fadeIn + 0.008); // opt 5: fadeIn always set, ?? 1 removed
     const tFar    = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
     const tNear   = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
-    const twinkle = 0.7 + 0.3 * Math.sin(colorTime * s.twinkleSpd + s.phase);
+    const twinkle = 0.7 + 0.3 * Math.sin(twinkleTime * s.twinkleSpd + s.phase);
     const alpha   = Math.max(0, tFar * tNear * twinkle * s.fadeIn);
     const rr      = Math.max(0.3, s.size * (FOCAL / s.z));
 

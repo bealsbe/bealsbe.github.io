@@ -14,7 +14,7 @@ let avatarTipTimeout;
 function showAvatarTip(link) {
   const r = link.getBoundingClientRect();
   tip.style.left = (r.left + r.width / 2) + 'px';
-  tip.style.top  = (r.top - 36) + 'px';
+  tip.style.top  = (r.bottom + 10) + 'px';
   tip.classList.add('visible');
   clearTimeout(avatarTipTimeout);
 }
@@ -78,7 +78,7 @@ function closeDiscordModal() { discordOverlay.classList.remove('visible'); }
 _clicks.push(e => {
   if (e.target.closest('#discord-btn')) {
     e.preventDefault();
-    navigator.clipboard?.writeText('beals');
+    navigator.clipboard?.writeText('beals').catch(() => {});
     showToast();
     openDiscordModal();
   }
@@ -289,7 +289,6 @@ document.querySelectorAll('.link-btn').forEach(btn => {
   `;
   document.body.appendChild(overlay);
 
-  const card     = overlay.querySelector('.lightbox-card');
   const img      = overlay.querySelector('.lightbox-img');
   const closeBtn = overlay.querySelector('.lightbox-close');
   const prevBtn  = overlay.querySelector('.lightbox-prev');
@@ -300,7 +299,6 @@ document.querySelectorAll('.link-btn').forEach(btn => {
 
   let items = [];
   let currentIdx = 0;
-  let resizeTimer = null;
 
   function getItems() {
     return Array.from(document.querySelectorAll('.gallery-item'));
@@ -319,51 +317,26 @@ document.querySelectorAll('.link-btn').forEach(btn => {
       d.classList.toggle('active', i === idx);
     });
 
+    const src = item.href;
+    const alt = item.querySelector('img')?.alt || '';
     if (!direction) {
-      // Initial open — just set src, card springs in at natural size
-      img.src = item.href;
-      img.alt = item.querySelector('img')?.alt || '';
+      img.src = src;
+      img.alt = alt;
       return;
     }
 
-    // Preload the target image so the resize measurement is synchronous
+    // The frame is a fixed size, so paging never resizes anything: wait until the next image
+    // is decoded, swap it in, and swipe it in from the side we're moving toward
     const probe = new Image();
-    const doTransition = () => {
-      const r = card.getBoundingClientRect();
-
-      // Measure new dimensions, swap image, swipe and resize simultaneously
-      card.style.width  = r.width  + 'px';
-      card.style.height = r.height + 'px';
-      img.src = item.href;
-      img.alt = item.querySelector('img')?.alt || '';
-      card.style.width  = '';
-      card.style.height = '';
-      const nw = card.offsetWidth;
-      const nh = card.offsetHeight;
-      card.style.width  = r.width  + 'px';
-      card.style.height = r.height + 'px';
-      void card.offsetWidth;
-      card.style.width  = nw + 'px';
-      card.style.height = nh + 'px';
-
+    probe.src = src;
+    probe.decode().catch(() => {}).then(() => {
+      if (items[currentIdx] !== item) return; // already paged past this one
+      img.src = src;
+      img.alt = alt;
       img.classList.remove('swipe-left', 'swipe-right');
-      requestAnimationFrame(() => {
-        img.classList.add(direction > 0 ? 'swipe-right' : 'swipe-left');
-      });
-
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        card.style.width  = '';
-        card.style.height = '';
-      }, 280);
-    };
-
-    probe.src = item.href;
-    if (probe.complete) {
-      doTransition();         // already cached — run immediately, no delay
-    } else {
-      probe.onload = doTransition;  // wait for network, then run
-    }
+      void img.offsetWidth; // restart the animation
+      img.classList.add(direction > 0 ? 'swipe-right' : 'swipe-left');
+    });
   }
 
   function openLightbox(item) {
@@ -391,8 +364,6 @@ document.querySelectorAll('.link-btn').forEach(btn => {
 
   function closeLightbox() {
     overlay.classList.remove('visible');
-    card.style.width  = '';
-    card.style.height = '';
   }
 
   closeBtn.addEventListener('click', closeLightbox);
@@ -428,13 +399,21 @@ document.querySelectorAll('.link-btn').forEach(btn => {
 
 // --- Hex swatch copy ---
 function copyHex(btn, hex) {
-  navigator.clipboard.writeText(hex);
+  navigator.clipboard?.writeText(hex).catch(() => {});
   const span = btn.querySelector('.swatch-hex');
   const prev = span.textContent;
   span.textContent = 'Copied!';
   btn.style.opacity = '0.8';
   setTimeout(() => { span.textContent = prev; btn.style.opacity = ''; }, 1200);
 }
+
+// --- Scroll flag: lets CSS switch off hover effects while the page is moving ---
+let scrollTimer;
+window.addEventListener('scroll', () => {
+  document.documentElement.classList.add('is-scrolling');
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => document.documentElement.classList.remove('is-scrolling'), 150);
+}, { passive: true });
 
 // --- Single body click dispatcher ---
 document.body.addEventListener('click', e => { for (const fn of _clicks) fn(e); });
@@ -451,15 +430,21 @@ window.addEventListener('load', async () => {
       const worker    = new Worker('/js/canvas-worker.js');
 
       worker.postMessage(
-        { type: 'init', canvas: offscreen, bitmaps, width: innerWidth, height: innerHeight },
+        { type: 'init', canvas: offscreen, bitmaps, width: cnvs.clientWidth, height: cnvs.clientHeight },
         [offscreen, ...bitmaps]
       );
 
+      // Only resize when the canvas box actually changed; scrolling on a phone fires resize events
+      // as the address bar moves, and each real resize clears the canvas
       let workerResizeTimer;
+      let sentW = cnvs.clientWidth, sentH = cnvs.clientHeight;
       window.addEventListener('resize', () => {
         clearTimeout(workerResizeTimer);
         workerResizeTimer = setTimeout(() => {
-          worker.postMessage({ type: 'resize', width: innerWidth, height: innerHeight });
+          const w = cnvs.clientWidth, h = cnvs.clientHeight;
+          if (w === sentW && h === sentH) return;
+          sentW = w; sentH = h;
+          worker.postMessage({ type: 'resize', width: w, height: h });
         }, 60);
       });
 
@@ -479,8 +464,9 @@ window.addEventListener('load', async () => {
   let connectDistSq = 0; // opt 4 — declared here so resize() can write to it immediately
 
   function resize() {
-    W = cnvs.width  = innerWidth;
-    H = cnvs.height = innerHeight;
+    if (W === cnvs.clientWidth && H === cnvs.clientHeight) return; // unchanged (e.g. phone address bar moved)
+    W = cnvs.width  = cnvs.clientWidth;
+    H = cnvs.height = cnvs.clientHeight;
     cx = W / 2;
     cy = H / 2;
     const d = Math.min(220, Math.min(W, H) * 0.26);
@@ -493,32 +479,19 @@ window.addEventListener('load', async () => {
     fbResizeTimer = setTimeout(resize, 60);
   });
 
-  const BG_COLORS_SRC = [
-    [  0, 180, 150],
-    [ 20, 170,  90],
-    [ 20, 150, 210],
-    [110,  40, 210],
-    [ 40,  80, 220],
-    [190,  20, 150],
-  ];
-  const BG_COLORS = [...BG_COLORS_SRC];
-  for (let i = BG_COLORS.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [BG_COLORS[i], BG_COLORS[j]] = [BG_COLORS[j], BG_COLORS[i]];
-  }
+  const SKY = '#0a0a12'; // fixed background colour
 
-  const COUNT        = 6;
+  const COUNT        = 8; // flying stickers on screen
   const STAR_COUNT   = 15;
   const FOCAL        = 320;
   const Z_FAR        = 2000;
   const Z_NEAR       = 60;
-  const SPREAD       = 1800;
-  const BASE_SZ      = 0.18;
+  const SPREAD       = 5600; // start wide so stickers clear the card sooner
+  const BASE_SZ      = 0.30; // sticker size
   const N_CLUSTERS  = 3;
   const MIN_CLUSTER = 3;
 
-  let colorTime   = 0.5;
-  let colorFadeIn = 0;
+  let twinkleTime   = 0.5;
   const sprites = [];
   const stars   = [];
 
@@ -636,17 +609,9 @@ window.addEventListener('load', async () => {
 
     ctx.clearRect(0, 0, W, H);
 
-    colorFadeIn = Math.min(1, colorFadeIn + 1 / 1800);
-    colorTime += 1 / 1400;
-    const cyclePos  = colorTime % BG_COLORS.length;
-    const idx       = Math.floor(cyclePos);
-    const t         = cyclePos - idx;
-    const pulseWindow = 0.38;
-    const pulse     = t < pulseWindow ? Math.sin((t / pulseWindow) * Math.PI) : 0;
-    const intensity = pulse * 0.12 * colorFadeIn;
-    const [r, g, b] = BG_COLORS[idx % BG_COLORS.length];
+    twinkleTime += 1 / 1400;
 
-    ctx.fillStyle = `rgb(${Math.round(10 + r * intensity)}, ${Math.round(10 + g * intensity)}, ${Math.round(18 + b * intensity)})`;
+    ctx.fillStyle = SKY;
     ctx.fillRect(0, 0, W, H);
 
     sprites.sort((a, b) => b.z - a.z);
@@ -658,7 +623,7 @@ window.addEventListener('load', async () => {
 
       if (s.z <= Z_NEAR) { Object.assign(s, randomSprite(false)); continue; }
 
-      const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
+      const tFar  = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.12)); // reach full opacity early
       const tNear = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
       const alpha = tFar * tNear;
       if (alpha < 0.05) continue;
@@ -698,7 +663,7 @@ window.addEventListener('load', async () => {
       s.fadeIn = Math.min(1, s.fadeIn + 0.008); // opt 5: fadeIn always set, ?? 1 removed
       const tFar    = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
       const tNear   = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
-      const twinkle = 0.7 + 0.3 * Math.sin(colorTime * s.twinkleSpd + s.phase);
+      const twinkle = 0.7 + 0.3 * Math.sin(twinkleTime * s.twinkleSpd + s.phase);
       const alpha   = Math.max(0, tFar * tNear * twinkle * s.fadeIn);
       const rr      = Math.max(0.3, s.size * (FOCAL / s.z));
 
