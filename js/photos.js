@@ -66,10 +66,13 @@
     `${gridPhotos(a).length} photo${gridPhotos(a).length === 1 ? '' : 's'}`,
   ].filter(Boolean).join(' · ');
 
-  function bannerHTML(a, tag) {
+  // Album cards are small enough for the thumbnail; the hero banner spans the whole card, so it
+  // gets the full image with the thumbnail as a placeholder until it arrives
+  function bannerHTML(a, tag, full = false) {
     const c = coverOf(a);
+    const bg = full ? ` style="background-image: url('${esc(c.thumb)}')"` : '';
     return `
-      <img class="album-cover" src="${esc(c.thumb)}" alt="" width="${esc(Number(c.w) || 0)}" height="${esc(Number(c.h) || 0)}" loading="lazy" decoding="async">
+      <img class="album-cover${full ? ' album-cover--full' : ''}" src="${esc(full ? c.src : c.thumb)}" alt="" width="${esc(Number(c.w) || 0)}" height="${esc(Number(c.h) || 0)}" loading="${full ? 'eager' : 'lazy'}" decoding="async"${bg}>
       <div class="album-text">
         <${tag} class="album-name">${esc(a.name)}</${tag}>
         <p class="album-meta">${esc(albumMeta(a))}</p>
@@ -231,7 +234,7 @@
     viewEl.innerHTML = `
       <div class="album-banner">
         <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(sectionName(a.section))}</a>
-        ${bannerHTML(a, 'h2')}
+        ${bannerHTML(a, 'h2', true)}
       </div>
       <div class="photo-grid">${shown.map((p, i) => {
         const w = Number(p.w) || 0, h = Number(p.h) || 0, ratio = w && h ? (w / h).toFixed(4) : '1.5';

@@ -299,6 +299,13 @@
   opacity: 1;
 }
 
+/* Hero banner: the thumbnail shows as a blurred background while the full image loads */
+.album-cover--full {
+  opacity: 1;
+  background-size: cover;
+  background-position: center;
+}
+
 /* Darken the top so the name reads over any photo */
 .album-text {
   position: absolute;
