@@ -34,7 +34,9 @@
   // height falls back to a short, left-aligned last row.
   function layout() {
     if (!grid || !grid.isConnected) return;
-    const width = grid.clientWidth;
+    // Fractional width floored: clientWidth rounds up, and a row a hair wider than the real box
+    // wraps its last tile to the next line (seen at 125% display scaling)
+    const width = Math.floor(grid.getBoundingClientRect().width);
     if (!width) return;
     const target = targetRowHeight(width);
     const tiles = Array.from(grid.children).filter(el => el.classList.contains('photo-tile'));
