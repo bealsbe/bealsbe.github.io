@@ -908,16 +908,13 @@
       }, 300);
       return;
     }
-    // Mouse: a click on the dark area around the photo closes; the photo itself zooms on double-click
-    if (!overImg(e.clientX, e.clientY)) closeViewer();
+    // Mouse: a click on the photo zooms in at that point (and back out); the dark area closes
+    if (overImg(e.clientX, e.clientY)) toggleZoomAt(e.clientX, e.clientY);
+    else closeViewer();
   }
 
   // Pointer capture retargets click/dblclick to the stage, so test the point against the photo's box
   const overImg = (x, y) => { const r = img.getBoundingClientRect(); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; };
-  stage.addEventListener('dblclick', e => {
-    if (overImg(e.clientX, e.clientY)) toggleZoomAt(e.clientX, e.clientY);
-  });
-
   stage.addEventListener('wheel', e => {
     e.preventDefault();
     const factor = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015));
