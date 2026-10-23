@@ -15,9 +15,13 @@ document.addEventListener('DOMContentLoaded', () => {
   const loadedSheets = new Set(
     Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map(l => l.href)
   );
+  const loadedScripts = new Set(
+    Array.from(document.querySelectorAll('script[src]')).map(s => s.src)
+  );
 
   const normPath = p => p.replace(/index\.html$/, '').replace(/\/$/, '') || '/';
   const pathOf = url => normPath(new URL(url).pathname);
+  let currentPath = pathOf(location.href);
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   // Transition style, for comparing options: load any page with ?t=morph, ?t=slide or ?t=fade.
@@ -34,9 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const wait = ms => new Promise(r => setTimeout(r, ms));
 
-  // Fetch and decode every image in the incoming card so nothing pops in (or resizes the card) after it appears
+  // Fetch and decode every image in the incoming card so nothing pops in (or resizes the card) after it appears.
+  // Lazy images (photo grids) are left to load on their own.
   function preloadImages(card, baseUrl) {
-    return Promise.all(Array.from(card.querySelectorAll('img')).map(img => {
+    return Promise.all(Array.from(card.querySelectorAll('img:not([loading="lazy"])')).map(img => {
       const im = new Image();
       im.src = new URL(img.getAttribute('src'), baseUrl).href;
       return im.decode().catch(() => {});
@@ -82,15 +87,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const curCard = document.querySelector('.profile-card');
     if (!newCard || !curCard) { window.location.href = absUrl; return; }
 
-    // Inject any stylesheets the new page needs that aren't already loaded
+    // Load any stylesheets and scripts the new page needs that aren't already loaded, and wait for them
+    // (briefly) so the card is styled and its scripts are ready when it appears
+    const pending = [];
     newDoc.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
       const href = new URL(link.getAttribute('href'), absUrl).href;  // relative to the new page, not this one
-      if (!loadedSheets.has(href)) {
-        loadedSheets.add(href);
-        link.href = href;
-        document.head.appendChild(document.adoptNode(link));
-      }
+      if (loadedSheets.has(href)) return;
+      loadedSheets.add(href);
+      link.href = href;
+      pending.push(new Promise(r => { link.onload = link.onerror = r; }));
+      document.head.appendChild(document.adoptNode(link));
     });
+    newDoc.querySelectorAll('script[src]').forEach(script => {
+      const src = new URL(script.getAttribute('src'), absUrl).href;
+      if (loadedScripts.has(src)) return;
+      loadedScripts.add(src);
+      const el = document.createElement('script');
+      el.src = src;
+      el.async = false; // keep the page's script order (a data file before the code that reads it)
+      pending.push(new Promise(r => { el.onload = el.onerror = r; }));
+      document.head.appendChild(el);
+    });
+    await Promise.race([Promise.all(pending), wait(1500)]);
 
     const swap = () => {
       // Push state BEFORE swapping card so relative image URLs in the new card
@@ -100,6 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
       curCard.replaceWith(newCard);
       window.scrollTo(0, 0);
       document.title = newDoc.title;
+      currentPath = pathOf(absUrl);
+      // Page scripts (js/photos.js) set up the new card on this
+      document.dispatchEvent(new CustomEvent('pageswap', { detail: { url: absUrl } }));
     };
 
     if (useFade) {
@@ -140,6 +161,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   window.addEventListener('popstate', e => {
+    // Hash-only history entries (the photo viewer's #p-<id>) aren't page navigations
+    if (pathOf(location.href) === currentPath) return;
     const url = e.state?.absUrl || window.location.href;
     navigateTo(url, false);
   });

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Beals — Photography</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/photos.css">
+  </head>
+  <body class="photos-page">
+    <main>
+      <div class="shell">
+        <nav class="site-nav">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/ref/" class="nav-link">Character Ref</a>
+          <a href="/photos/" class="nav-link active">Photography</a>
+        </nav>
+        <div class="profile-card photo-card">
+          <div class="photo-header">
+            <h1 class="name">Photography</h1>
+          </div>
+
+          <div class="divider"></div>
+
+          <!-- Filled by js/photos.js from the bucket manifest: featured slider, section tabs, then the album list or an open album -->
+          <div class="photo-featured"></div>
+          <div class="photo-filters" role="tablist" aria-label="Sections"></div>
+          <div class="photo-view"></div>
+        </div>
+      </div>
+    </main>
+
+    <canvas></canvas>
+
+    <div class="images">
+      <picture><source srcset="../img/merp1.webp" type="image/webp"><img id="img-merp1" src="../img/merp1.png"></picture>
+      <picture><source srcset="../img/merp2.webp" type="image/webp"><img id="img-merp2" src="../img/merp2.png"></picture>
+      <picture><source srcset="../img/bealsonwheels.webp" type="image/webp"><img id="img-bealsonwheels" src="../img/bealsonwheels.png"></picture>
+    </div>
+
+    <script src="../js/index.js" defer></script>
+    <script src="../js/transitions.js" defer></script>
+    <script src="../js/photos-source.js" defer></script>
+    <script src="../js/photos.js" defer></script>
+  </body>
+</html>

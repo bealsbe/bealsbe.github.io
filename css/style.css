@@ -102,6 +102,10 @@ main {
   max-width: 960px;
 }
 
+.shell:has(.photo-card) {
+  max-width: 1280px;
+}
+
 /* === Page transitions ===
    Three styles to compare; pick one by loading the site with ?t=morph, ?t=slide or ?t=fade.
    morph and slide use the View Transitions API; browsers without it always get fade. */

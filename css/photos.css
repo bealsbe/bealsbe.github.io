@@ -1,0 +1,1008 @@
+/* === Photography page === */
+
+/* Wider margins than the other cards: photos want breathing room from the frame.
+   The padding lives in variables so the album banner can cancel it and bleed to the card edge. */
+.profile-card.photo-card {
+  --pad-top: 32px;
+  --pad-x: 24px;
+  --pad-bottom: 36px;
+  padding: var(--pad-top) var(--pad-x) var(--pad-bottom);
+}
+
+@media (min-width: 700px) {
+  .profile-card.photo-card {
+    --pad-top: 44px;
+    --pad-x: 48px;
+    --pad-bottom: 52px;
+  }
+}
+
+.photo-header {
+  margin-bottom: 4px;
+}
+
+.photo-header .bio {
+  margin-top: 10px;
+  max-width: 60ch;
+}
+
+/* --- Collection chips: same language as the nav tabs (text + orange underline) --- */
+.photo-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  margin: 0 0 22px;
+}
+
+.photo-chip {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.photo-chip:hover {
+  color: var(--text);
+}
+
+.photo-chip.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.photo-chip:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --- View area: the album list or an open album. Swaps with a short fade --- */
+.photo-view {
+  transition: opacity 150ms ease;
+}
+
+.photo-view.is-switching {
+  opacity: 0;
+}
+
+/* Inside an album the banner takes over the top of the card: no page header, divider, slider or chips */
+.photo-card.in-album .photo-header,
+.photo-card.in-album .divider,
+.photo-card.in-album .photo-featured,
+.photo-card.in-album .photo-filters {
+  display: none;
+}
+
+/* --- Featured slider: hand-picked photos rotating above the album list --- */
+.featured {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  margin: 0 0 26px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+@media (min-width: 700px) {
+  .featured {
+    aspect-ratio: 2.5 / 1;
+    margin-bottom: 32px;
+  }
+}
+
+.featured-link {
+  position: absolute;
+  inset: 0;
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.featured-stage {
+  position: absolute;
+  inset: 0;
+}
+
+/* Two stacked layers; the active one fades in over the other */
+.featured-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 700ms ease;
+}
+
+.featured-img.is-active {
+  opacity: 1;
+}
+
+.featured-img.no-fade {
+  transition: none;
+}
+
+.featured-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 20px 22px;
+  background: linear-gradient(to bottom, rgba(5, 5, 9, 0) 45%, rgba(5, 5, 9, 0.55) 78%, rgba(5, 5, 9, 0.85) 100%);
+  pointer-events: none;
+}
+
+@media (min-width: 700px) {
+  .featured-text {
+    padding: 28px 32px;
+  }
+}
+
+.featured-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.55rem;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.featured-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.85rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  margin: 0;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+@media (min-width: 700px) {
+  .featured-title {
+    font-size: 1.1rem;
+  }
+}
+
+.featured-meta {
+  margin: 0;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+@media (hover: hover) {
+  .featured-link:hover .featured-img.is-active {
+    filter: brightness(1.06);
+  }
+}
+
+.featured-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Arrows: appear on hover, like the viewer's */
+.featured-arrow {
+  position: absolute;
+  top: 50%;
+  margin-top: -18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 200ms ease, background 150ms ease;
+  z-index: 2;
+}
+
+.featured-arrow svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.featured-prev { left: 14px; }
+.featured-next { right: 14px; }
+
+.featured:hover .featured-arrow,
+.featured-arrow:focus-visible {
+  opacity: 0.75;
+}
+
+.featured-arrow:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .featured-arrow { display: none; }
+}
+
+/* Dots: bottom-right next to the caption on desktop; top-right on phones so they never sit on the text */
+.featured-dots {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+
+@media (min-width: 700px) {
+  .featured-dots {
+    top: auto;
+    right: 32px;
+    bottom: 30px;
+  }
+}
+
+.featured-dot {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: background 220ms ease, transform 220ms ease;
+}
+
+.featured-dot.active {
+  background: var(--accent);
+  transform: scale(1.35);
+}
+
+.featured-dot:focus-visible,
+.featured-arrow:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.photo-empty {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 24px 0;
+}
+
+/* --- Album banners: cover image with the name on top --- */
+.album-list {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 700px) {
+  .album-list {
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+}
+
+/* Up to three albums across on wide screens */
+@media (min-width: 1000px) {
+  .album-list {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.album-card,
+.album-banner {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.album-card {
+  aspect-ratio: 2 / 1;
+}
+
+/* Hero banner: bleeds past the card padding to the card's own edges, with the name over a
+   gradient at the bottom and the back link floating in the corner */
+.album-banner {
+  height: 220px;
+  margin: calc(-1 * var(--pad-top)) calc(-1 * var(--pad-x)) 24px;
+}
+
+@media (min-width: 700px) {
+  .album-banner {
+    height: clamp(260px, 30vw, 360px);
+    margin-bottom: 36px;
+  }
+}
+
+/* Thin orange rule under the banner, like the card's divider */
+.album-banner::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(255, 109, 0, 0.6), transparent);
+  z-index: 2;
+}
+
+.album-banner .album-text {
+  justify-content: flex-end;
+  padding: 24px var(--pad-x) 26px;
+  gap: 10px;
+  background: linear-gradient(to bottom, rgba(13, 13, 21, 0.45) 0%, rgba(13, 13, 21, 0) 30%, rgba(13, 13, 21, 0) 45%, rgba(13, 13, 21, 0.72) 80%, rgba(13, 13, 21, 0.92) 100%);
+}
+
+.album-banner .album-name {
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+@media (min-width: 700px) {
+  .album-banner .album-name {
+    font-size: 1.35rem;
+  }
+
+  .album-banner .album-meta {
+    font-size: 0.88rem;
+  }
+}
+
+.album-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 300ms ease, transform 400ms cubic-bezier(0.2, 0, 0, 1), filter 150ms ease;
+}
+
+.album-cover.is-loaded {
+  opacity: 1;
+}
+
+/* Darken the top so the name reads over any photo */
+.album-text {
+  position: absolute;
+  inset: 0;
+  padding: 18px 20px;
+  background: linear-gradient(to bottom, rgba(5, 5, 9, 0.78) 0%, rgba(5, 5, 9, 0.35) 40%, rgba(5, 5, 9, 0) 70%);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.album-name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.78rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  margin: 0;
+  color: var(--text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8), 0 0 12px rgba(0, 0, 0, 0.5);
+}
+
+.album-meta {
+  margin: 0;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+@media (hover: hover) {
+  .album-card:hover .album-cover {
+    transform: scale(1.03);
+    filter: brightness(1.08);
+  }
+}
+
+.album-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Back link: plain text floating in the banner's top-left corner, same style as the chips */
+.album-back {
+  position: absolute;
+  top: 20px;
+  left: var(--pad-x);
+  z-index: 3;
+  display: inline-block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  padding: 4px 0;
+  border-bottom: 2px solid transparent;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8), 0 0 10px rgba(0, 0, 0, 0.5);
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.album-back:hover {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+@media (max-width: 699px) {
+  .album-back {
+    top: 14px;
+  }
+}
+
+.album-back:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* --- Justified grid: js/photos.js sets each tile's width/height so rows fill the card exactly --- */
+.photo-grid {
+  --gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--gap);
+}
+
+.photo-tile {
+  display: block;
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.045); /* shown until the thumbnail arrives */
+}
+
+.photo-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 300ms ease, filter 150ms ease;
+}
+
+.photo-tile img.is-loaded {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .photo-tile:hover img {
+    filter: brightness(1.08);
+  }
+}
+
+.photo-tile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* While the page scrolls, tiles sliding under the cursor shouldn't react */
+.is-scrolling .photo-grid {
+  pointer-events: none;
+}
+
+/* === Photo viewer === */
+html.pv-open {
+  overflow: hidden;
+}
+
+.pv {
+  --pv-top: 56px;      /* top bar */
+  --pv-bottom: 96px;   /* filmstrip */
+  --pv-right: 0px;     /* details panel, desktop */
+  --pv-thumb: 64px;
+  --pv-interval: 4000ms;
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: #050509;
+  color: var(--text);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 240ms ease, visibility 0s linear 240ms;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pv.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 240ms ease;
+}
+
+.pv.immersive {
+  --pv-top: 0px;
+  --pv-bottom: 0px;
+}
+
+/* Stage: the photo is fitted inside whatever the chrome leaves free. Hiding the chrome lets it grow. */
+.pv-stage {
+  position: absolute;
+  top: var(--pv-top);
+  right: var(--pv-right);
+  bottom: var(--pv-bottom);
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: hidden;
+  touch-action: none;
+  transition: top 320ms cubic-bezier(0.2, 0, 0, 1), bottom 320ms cubic-bezier(0.2, 0, 0, 1), right 320ms cubic-bezier(0.2, 0, 0, 1), padding 320ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.pv.immersive .pv-stage {
+  padding: 0;
+}
+
+.pv-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  cursor: zoom-in;
+  transform-origin: center;
+  transition: transform 200ms ease, opacity 200ms ease;
+  will-change: transform;
+}
+
+.pv.zoomed .pv-img {
+  cursor: grab;
+}
+
+.pv.zoomed .pv-img.is-dragging {
+  cursor: grabbing;
+  transition: none;
+}
+
+.pv-img.is-pinching {
+  transition: none;
+}
+
+.pv.loading .pv-img {
+  opacity: 0.35;
+}
+
+/* Photo change: fade, with a short slide in the direction of travel */
+@keyframes pv-from-right { from { opacity: 0; transform: translateX(14px); } }
+@keyframes pv-from-left  { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes pv-fade       { from { opacity: 0; } }
+
+.pv-img.swap-right { animation: pv-from-right 240ms ease-out both; }
+.pv-img.swap-left  { animation: pv-from-left 240ms ease-out both; }
+.pv-img.swap-fade  { animation: pv-fade 240ms ease-out both; }
+
+/* Spinner: only shows if a photo takes a moment */
+.pv-spinner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: pv-spin 800ms linear infinite;
+  transition: opacity 200ms ease;
+}
+
+.pv.loading .pv-spinner {
+  opacity: 1;
+  transition-delay: 250ms;
+}
+
+@keyframes pv-spin { to { transform: rotate(360deg); } }
+
+/* --- Chrome: top bar, arrows, filmstrip. All fade out together in immersive mode --- */
+.pv-top,
+.pv-arrow,
+.pv-film {
+  transition: opacity 260ms ease, transform 260ms ease, visibility 0s linear 0s;
+}
+
+.pv.immersive .pv-top,
+.pv.immersive .pv-arrow,
+.pv.immersive .pv-film {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 260ms ease, transform 260ms ease, visibility 0s linear 260ms;
+}
+
+.pv.immersive .pv-top  { transform: translateY(-8px); }
+.pv.immersive .pv-film { transform: translateY(8px); }
+
+.pv-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: var(--pv-right);
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px 0 20px;
+}
+
+.pv-counter {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.pv-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.pv-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.pv-btn {
+  appearance: none;
+  background: none;
+  border: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 150ms ease, background 150ms ease;
+}
+
+.pv-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pv-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.pv-btn[aria-pressed="true"] {
+  color: var(--accent);
+}
+
+.pv-btn:focus-visible,
+.pv-arrow:focus-visible,
+.pv-thumb:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Icon pairs: show one or the other depending on state */
+.pv .icon-pause, .pv .icon-zoom-out { display: none; }
+.pv.playing .icon-play, .pv.zoomed .icon-zoom-in { display: none; }
+.pv.playing .icon-pause, .pv.zoomed .icon-zoom-out { display: block; }
+
+/* Slideshow progress: a thin line at the top */
+.pv-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: 0;
+  background: var(--accent);
+  z-index: 5;
+  pointer-events: none;
+}
+
+.pv.playing .pv-progress {
+  animation: pv-progress var(--pv-interval) linear forwards;
+}
+
+@keyframes pv-progress { from { width: 0; } to { width: 100%; } }
+
+/* Arrows: round, like the ref-sheet lightbox */
+.pv-arrow {
+  position: absolute;
+  top: 50%;
+  margin-top: -22px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.65;
+  z-index: 4;
+}
+
+.pv-arrow svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pv-arrow:hover {
+  background: rgba(0, 0, 0, 0.82);
+  opacity: 1;
+}
+
+.pv-prev { left: 20px; }
+.pv-next { right: calc(var(--pv-right) + 20px); transition: right 320ms cubic-bezier(0.2, 0, 0, 1), opacity 260ms ease, transform 260ms ease; }
+
+@media (hover: none) and (pointer: coarse) {
+  .pv-arrow { display: none; }
+}
+
+/* Filmstrip */
+.pv-film {
+  position: absolute;
+  left: 0;
+  right: var(--pv-right);
+  bottom: 0;
+  height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: safe center;
+  gap: 6px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  touch-action: pan-x;
+}
+
+.pv-film::-webkit-scrollbar {
+  display: none;
+}
+
+.pv-thumb {
+  appearance: none;
+  flex: 0 0 auto;
+  height: var(--pv-thumb);
+  aspect-ratio: 3 / 2; /* overridden per thumb */
+  padding: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  opacity: 0.45;
+  box-sizing: content-box;
+  transition: opacity 150ms ease, border-color 150ms ease;
+}
+
+.pv-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pv-thumb:hover {
+  opacity: 0.8;
+}
+
+.pv-thumb.active {
+  opacity: 1;
+  border-bottom-color: var(--accent);
+}
+
+/* --- Details panel --- */
+.pv-info {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 320px;
+  background: rgba(13, 13, 21, 0.97);
+  border-left: 1px solid var(--card-border);
+  padding: 20px 22px 28px;
+  overflow-y: auto;
+  transform: translateX(100%);
+  visibility: hidden;
+  transition: transform 320ms cubic-bezier(0.2, 0, 0, 1), visibility 0s linear 320ms;
+  z-index: 6;
+}
+
+.pv.info-open {
+  --pv-right: 320px;
+}
+
+.pv.info-open .pv-info {
+  transform: none;
+  visibility: visible;
+  transition: transform 320ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.pv-info-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.pv-info-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.65rem;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.pv-info-close {
+  width: 32px;
+  height: 32px;
+  margin-right: -8px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.pv-info-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 8px;
+  color: var(--text);
+}
+
+.pv-info-caption {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0 0 20px;
+}
+
+.pv-meta {
+  margin: 0 0 22px;
+  font-size: 0.85rem;
+}
+
+.pv-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pv-meta-row:first-child {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.pv-meta dt {
+  color: var(--text-muted);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.pv-meta dd {
+  margin: 0;
+  text-align: right;
+  color: var(--text);
+}
+
+.pv-original {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: 1px;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.pv-original:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+/* --- Phones: details become a bottom sheet, chrome gets shorter --- */
+@media (max-width: 699px) {
+  .pv {
+    --pv-top: 52px;
+    --pv-bottom: 76px;
+    --pv-thumb: 48px;
+  }
+
+  .pv.info-open {
+    --pv-right: 0px;
+  }
+
+  .pv-top {
+    padding-left: 16px;
+  }
+
+  .pv-title {
+    display: none;
+  }
+
+  .pv-film {
+    height: 76px;
+    padding: 12px 16px;
+  }
+
+  .pv-info {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto;
+    max-height: 62%;
+    border-left: 0;
+    border-top: 1px solid var(--card-border);
+    border-radius: 12px 12px 0 0;
+    transform: translateY(100%);
+  }
+}
+
+/* --- Reduced motion --- */
+@media (prefers-reduced-motion: reduce) {
+  .pv,
+  .pv-stage,
+  .pv-img,
+  .pv-top,
+  .pv-arrow,
+  .pv-film,
+  .pv-info,
+  .photo-tile img {
+    transition: none;
+  }
+
+  .pv-img.swap-right,
+  .pv-img.swap-left,
+  .pv-img.swap-fade {
+    animation: none;
+  }
+
+  .photo-view,
+  .album-cover,
+  .featured-img,
+  .featured-arrow {
+    transition: none;
+  }
+}
