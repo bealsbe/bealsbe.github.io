@@ -76,9 +76,11 @@
       </div>`;
   }
 
-  /* --- Featured slider: rotates through hand-picked photos above the album list --- */
-  const SLIDE_MS = 5000;
-  const slider = { items: [], idx: 0, timer: 0, layer: 0, paused: false, token: 0 };
+  /* --- Featured belt: a conveyor of hand-picked photos at their real aspect ratio. It drifts
+     slowly on its own, pauses while hovered or handled, and can be wheel-scrolled, dragged or
+     swiped like any strip. The set is repeated so it loops without a visible seam. --- */
+  const BELT_SPEED = 26;  // px per second
+  const belt = { items: [], el: null, track: null, copies: 1, pos: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false };
 
   function featuredItems() {
     return (typeof PHOTO_FEATURED !== 'undefined' ? PHOTO_FEATURED : []).map(f => {
@@ -88,100 +90,120 @@
     }).filter(Boolean);
   }
 
+  function beltItemHTML({ album, photo }, copy) {
+    const w = Number(photo.w) || 3, h = Number(photo.h) || 2;
+    return `
+      <a class="belt-item" href="${esc(hashFor(album.id, photo.id))}" data-album="${esc(album.id)}" data-photo="${esc(photo.id)}" style="aspect-ratio: ${w} / ${h}"${copy ? ' aria-hidden="true" tabindex="-1"' : ''}>
+        <img src="${esc(photo.thumb)}" alt="${esc(photoLabel(photo, album, -1))}" width="${w}" height="${h}" loading="${copy ? 'lazy' : 'eager'}" decoding="async">
+        <span class="belt-caption"><span class="belt-title">${esc(photo.title || album.name)}</span>${photo.title ? `<span class="belt-album">${esc(album.name)}</span>` : ''}</span>
+      </a>`;
+  }
+
   function renderFeatured() {
     if (!featuredEl) return;
-    slider.items = featuredItems();
-    clearTimeout(slider.timer);
-    if (!slider.items.length) { featuredEl.innerHTML = ''; return; }
-    const multi = slider.items.length > 1;
+    beltStop();
+    belt.items = featuredItems();
+    belt.el = belt.track = null;
+    if (!belt.items.length) { featuredEl.innerHTML = ''; return; }
     featuredEl.innerHTML = `
-      <section class="featured" aria-roledescription="carousel" aria-label="Featured photos">
-        <a class="featured-link" href="#">
-          <div class="featured-stage">
-            <img class="featured-img" alt="" decoding="async">
-            <img class="featured-img" alt="" decoding="async">
-          </div>
-          <div class="featured-text">
-            <span class="featured-label">Featured</span>
-            <h2 class="featured-title"></h2>
-            <p class="featured-meta"></p>
-          </div>
-        </a>
-        ${multi ? `
-        <button type="button" class="featured-arrow featured-prev" aria-label="Previous featured photo">${ICON.prev}</button>
-        <button type="button" class="featured-arrow featured-next" aria-label="Next featured photo">${ICON.next}</button>
-        <div class="featured-dots" role="tablist">${slider.items.map((_, i) =>
-          `<button type="button" class="featured-dot" role="tab" data-i="${i}" aria-label="Featured photo ${i + 1}"></button>`).join('')}</div>` : ''}
+      <section class="belt-section" aria-label="Featured photos">
+        <span class="belt-label">Featured</span>
+        <div class="belt">
+          <div class="belt-track">${belt.items.map(it => beltItemHTML(it, 0)).join('')}</div>
+        </div>
       </section>`;
-    slider.idx = -1;
-    slider.layer = 0;
-    // Hovering or focusing the slider pauses the rotation
-    const sec = featuredEl.querySelector('.featured');
-    const pause = () => { slider.paused = true; clearTimeout(slider.timer); };
-    const resume = () => { slider.paused = false; armSlide(); };
-    sec.addEventListener('mouseenter', pause);
-    sec.addEventListener('mouseleave', resume);
-    sec.addEventListener('focusin', pause);
-    sec.addEventListener('focusout', e => { if (!sec.contains(e.relatedTarget)) resume(); });
-    goToSlide(0, true);
+    belt.el = featuredEl.querySelector('.belt');
+    belt.track = featuredEl.querySelector('.belt-track');
+    belt.copies = 1;
+    fillBelt();
+
+    const el = belt.el;
+    el.addEventListener('mouseenter', () => { belt.hover = true; });
+    el.addEventListener('mouseleave', () => { belt.hover = false; });
+    el.addEventListener('focusin', () => { belt.hover = true; });
+    el.addEventListener('focusout', e => { if (!el.contains(e.relatedTarget)) belt.hover = false; });
+    el.addEventListener('wheel', () => beltHold(2500), { passive: true });
+    el.addEventListener('touchstart', () => beltHold(4000), { passive: true });
+    el.addEventListener('touchend', () => beltHold(2500), { passive: true });
+    // A scroll we didn't cause (wheel, touch, keyboard, drag) becomes the new position
+    el.addEventListener('scroll', () => {
+      if (Math.abs(el.scrollLeft - Math.round(belt.pos)) > 1) belt.pos = el.scrollLeft;
+      wrapBelt();
+    }, { passive: true });
+    // Mouse drag scrolls the strip. No pointer capture: it would retarget the click to the strip
+    // and the photo under the pointer would no longer open.
+    el.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      belt.drag = { x: e.clientX, from: el.scrollLeft };
+      belt.dragged = false;
+      e.preventDefault(); // no native image/link drag
+    });
+    beltStart();
   }
 
-  function goToSlide(i, instant) {
-    const n = slider.items.length;
-    if (!n || !featuredEl.isConnected) return;
-    i = (i + n) % n;
-    if (i === slider.idx) return;
-    slider.idx = i;
-    const { album, photo } = slider.items[i];
-    const sec = featuredEl.querySelector('.featured');
-    const imgs = sec.querySelectorAll('.featured-img');
-    const link = sec.querySelector('.featured-link');
-    link.href = hashFor(album.id, photo.id);
-    link.dataset.album = album.id;
-    link.dataset.photo = photo.id;
-    sec.querySelector('.featured-title').textContent = photo.title || album.name;
-    sec.querySelector('.featured-meta').textContent = [photo.title ? album.name : '', album.date && fmtDate(album.date, { year: 'numeric', month: 'short' })].filter(Boolean).join(' · ');
-    sec.querySelectorAll('.featured-dot').forEach((d, k) => { d.classList.toggle('active', k === i); d.setAttribute('aria-selected', k === i); });
-
-    // Decode into the hidden layer, then crossfade the layers
-    const token = ++slider.token;
-    const next = imgs[1 - slider.layer];
-    const im = new Image();
-    im.decoding = 'async';
-    im.src = photo.src;
-    const swap = () => {
-      if (token !== slider.token || !sec.isConnected) return;
-      next.src = photo.src;
-      next.alt = photo.title || '';
-      if (instant || reduceMotion.matches) next.classList.add('no-fade');
-      else next.classList.remove('no-fade');
-      imgs[slider.layer].classList.remove('is-active');
-      next.classList.add('is-active');
-      slider.layer = 1 - slider.layer;
-      armSlide();
-    };
-    im.decode().catch(() => {}).then(swap);
-    // Warm the next slide's image
-    if (n > 1) { const p2 = slider.items[(i + 1) % n].photo; const pre = new Image(); pre.src = p2.src; }
+  // Repeat the set until the strip can scroll freely in both directions, then start in the middle copy
+  function fillBelt() {
+    const el = belt.el, track = belt.track;
+    if (!el || !track) return;
+    const one = track.scrollWidth;
+    if (!one) return;
+    const need = Math.max(3, Math.ceil((el.clientWidth * 2) / one) + 1);
+    if (need > belt.copies) {
+      track.insertAdjacentHTML('beforeend', Array.from({ length: need - belt.copies }, () => belt.items.map(it => beltItemHTML(it, 1)).join('')).join(''));
+      belt.copies = need;
+    }
+    belt.pos = setWidth();
+    el.scrollLeft = belt.pos;
   }
 
-  function armSlide() {
-    clearTimeout(slider.timer);
-    if (slider.items.length < 2 || slider.paused || reduceMotion.matches || document.hidden) return;
-    slider.timer = setTimeout(() => goToSlide(slider.idx + 1), SLIDE_MS);
+  const setWidth = () => belt.track ? belt.track.scrollWidth / belt.copies : 0;
+
+  // Keep the position inside the middle copy; the strip looks the same one set left or right
+  function wrapBelt() {
+    const one = setWidth();
+    if (!one) return;
+    if (belt.pos < one * 0.5) { belt.pos += one; belt.el.scrollLeft = belt.pos; }
+    else if (belt.pos >= one * 1.5) { belt.pos -= one; belt.el.scrollLeft = belt.pos; }
   }
 
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) armSlide(); else clearTimeout(slider.timer); });
+  function beltTick(now) {
+    belt.raf = 0;
+    if (!belt.el || !belt.el.isConnected) return;
+    const dt = Math.min(0.1, (now - belt.last) / 1000);
+    belt.last = now;
+    const moving = !belt.hover && !belt.drag && now > belt.hold && !document.hidden && !reduceMotion.matches;
+    if (moving) {
+      belt.pos += BELT_SPEED * dt;
+      wrapBelt();
+      const next = Math.round(belt.pos);
+      if (next !== belt.el.scrollLeft) belt.el.scrollLeft = next;
+    }
+    belt.raf = requestAnimationFrame(beltTick);
+  }
+  function beltStart() {
+    if (!belt.el || belt.raf) return;
+    belt.last = performance.now();
+    belt.raf = requestAnimationFrame(beltTick);
+  }
+  function beltStop() {
+    if (belt.raf) cancelAnimationFrame(belt.raf);
+    belt.raf = 0;
+  }
+  const beltHold = ms => { belt.hold = Math.max(belt.hold, performance.now() + ms); };
 
-  // Swipe between slides on touch
-  let slideSwipe = null;
-  document.addEventListener('pointerdown', e => { if (e.pointerType === 'touch' && e.target.closest('.featured-stage')) slideSwipe = { x: e.clientX, y: e.clientY }; }, true);
-  document.addEventListener('pointerup', e => {
-    if (!slideSwipe) return;
-    const dx = e.clientX - slideSwipe.x, dy = e.clientY - slideSwipe.y;
-    slideSwipe = null;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { e.preventDefault(); goToSlide(slider.idx + (dx < 0 ? 1 : -1)); slideSwipe = 'done'; setTimeout(() => { slideSwipe = null; }, 0); }
-  }, true);
+  window.addEventListener('pointermove', e => {
+    if (!belt.drag || !belt.el) return;
+    const dx = e.clientX - belt.drag.x;
+    if (Math.abs(dx) > 4) { belt.dragged = true; belt.el.classList.add('is-dragging'); }
+    belt.el.scrollLeft = belt.drag.from - dx;
+    belt.pos = belt.el.scrollLeft;
+  });
+  const endBeltDrag = () => { if (!belt.drag) return; belt.drag = null; belt.el && belt.el.classList.remove('is-dragging'); beltHold(1500); };
+  window.addEventListener('pointerup', endBeltDrag);
+  window.addEventListener('pointercancel', endBeltDrag);
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) beltStop(); else if (!currentAlbum) beltStart(); });
+  window.addEventListener('resize', () => { if (belt.el) { belt.copies = belt.copies; fillBelt(); } });
 
   // Section view: one banner per album (folder), newest first
   function renderList() {
@@ -190,7 +212,7 @@
     grid = null;
     root.classList.remove('in-album');
     if (featuredEl && !featuredEl.children.length) renderFeatured();
-    armSlide();
+    else beltStart();
     const albums = PHOTO_ALBUMS.filter(a => a.section === section).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     viewEl.innerHTML = albums.length
       ? `<div class="album-list">${albums.map(a => `
@@ -205,7 +227,7 @@
     section = a.section;
     updateChips();
     root.classList.add('in-album');
-    clearTimeout(slider.timer);
+    beltStop();
     viewEl.innerHTML = `
       <div class="album-banner">
         <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(sectionName(a.section))}</a>
@@ -303,7 +325,7 @@
     viewEl = document.querySelector('.photo-view');
     featuredEl = document.querySelector('.photo-featured');
     grid = null;
-    clearTimeout(slider.timer);
+    beltStop();
     if (!root || !filtersEl || !viewEl) return;
 
     // Wait for the manifest; bail if the card was swapped meanwhile
@@ -347,15 +369,10 @@
     const chip = e.target.closest('.photo-chip');
     if (chip && filtersEl?.contains(chip)) { setSection(chip.dataset.section); return; }
 
-    const dot = e.target.closest('.featured-dot');
-    if (dot) { goToSlide(+dot.dataset.i); return; }
-    if (e.target.closest('.featured-prev')) { goToSlide(slider.idx - 1); return; }
-    if (e.target.closest('.featured-next')) { goToSlide(slider.idx + 1); return; }
-
-    const feat = e.target.closest('.featured-link');
+    const feat = e.target.closest('.belt-item');
     if (feat) {
-      if (slideSwipe === 'done') { e.preventDefault(); return; } // a swipe, not a click
       e.preventDefault();
+      if (belt.dragged) { belt.dragged = false; return; } // a drag, not a click
       history.pushState(null, '', hashFor(feat.dataset.album, feat.dataset.photo));
       applyRoute(parseHash());
       return;
