@@ -28,36 +28,69 @@
     return width < 500 ? 150 : width < 800 ? 190 : 230;
   }
 
-  // Justified rows: pack tiles until the row, scaled to fill the width, drops to the target height
+  // Justified rows: split the tiles into rows so that every row fills the width exactly and row
+  // heights stay as close to the target as possible (a linear partition over the tiles, so the
+  // last row is as full as any other). Only an album with too few photos to fill a row at a sane
+  // height falls back to a short, left-aligned last row.
   function layout() {
     if (!grid || !grid.isConnected) return;
     const width = grid.clientWidth;
     if (!width) return;
     const target = targetRowHeight(width);
     const tiles = Array.from(grid.children).filter(el => el.classList.contains('photo-tile'));
-    let row = [], ratioSum = 0;
+    const n = tiles.length;
+    if (!n) return;
+    const ratios = tiles.map(t => { const r = Number(t.dataset.ratio); return r > 0.1 && r < 10 ? r : 1.5; });
+    const rowHeight = (count, ratioSum) => (width - GAP * (count - 1)) / ratioSum;
+    const minH = target * 0.5, maxH = target * 1.6;
 
-    const flush = (last) => {
-      if (!row.length) return;
-      let h = (width - GAP * (row.length - 1)) / ratioSum;
-      if (last) h = Math.min(h, target * 1.15); // a short last row stays left-aligned instead of ballooning
+    // Sizes one row of tiles [from, to) at height h; the last tile absorbs the rounding so the
+    // widths add up to the grid width exactly (unless the row is deliberately left ragged)
+    const place = (from, to, h, ragged) => {
       let used = 0;
-      row.forEach((tile, i) => {
-        const isLast = i === row.length - 1 && !last;
-        const w = isLast ? width - GAP * (row.length - 1) - used : Math.floor(+tile.dataset.ratio * h);
+      for (let k = from; k < to; k++) {
+        const isLast = k === to - 1 && !ragged;
+        const w = isLast ? width - GAP * (to - from - 1) - used : Math.floor(ratios[k] * h);
         used += w;
-        tile.style.width = w + 'px';
-        tile.style.height = h.toFixed(2) + 'px';
-      });
-      row = []; ratioSum = 0;
+        tiles[k].style.width = w + 'px';
+        tiles[k].style.height = h.toFixed(2) + 'px';
+      }
     };
 
-    for (const tile of tiles) {
-      row.push(tile);
-      ratioSum += +tile.dataset.ratio;
-      if ((width - GAP * (row.length - 1)) / ratioSum <= target) flush(false);
+    // best[j] = lowest total deviation for the first j tiles; prev[j] = where that last row starts
+    const best = new Float64Array(n + 1).fill(Infinity);
+    const prev = new Int32Array(n + 1).fill(-1);
+    best[0] = 0;
+    for (let j = 1; j <= n; j++) {
+      let sum = 0;
+      for (let i = j - 1; i >= 0; i--) {
+        sum += ratios[i];
+        const h = rowHeight(j - i, sum);
+        if (h < minH) break;                       // more tiles only make the row shorter
+        if (h > maxH || best[i] === Infinity) continue;
+        const d = (h - target) / target;
+        const cost = best[i] + d * d;
+        if (cost < best[j]) { best[j] = cost; prev[j] = i; }
+      }
     }
-    flush(true);
+
+    if (best[n] < Infinity) {
+      for (let j = n; j > 0; j = prev[j]) {
+        const i = prev[j];
+        let sum = 0;
+        for (let k = i; k < j; k++) sum += ratios[k];
+        place(i, j, rowHeight(j - i, sum), false);
+      }
+      return;
+    }
+
+    // Fallback (very small albums): greedy rows, last one short and left-aligned
+    let start = 0, sum = 0;
+    for (let k = 0; k < n; k++) {
+      sum += ratios[k];
+      if (rowHeight(k - start + 1, sum) <= target) { place(start, k + 1, rowHeight(k - start + 1, sum), false); start = k + 1; sum = 0; }
+    }
+    if (start < n) place(start, n, Math.min(rowHeight(n - start, sum), target * 1.15), true);
   }
 
   const albumMeta = a => [
@@ -72,12 +105,111 @@
     const c = coverOf(a);
     const bg = full ? ` style="background-image: url('${esc(c.thumb)}')"` : '';
     return `
-      <img class="album-cover${full ? ' album-cover--full' : ''}" src="${esc(full ? c.src : c.thumb)}" alt="" width="${esc(Number(c.w) || 0)}" height="${esc(Number(c.h) || 0)}" loading="${full ? 'eager' : 'lazy'}" decoding="async"${bg}>
+      <img class="album-cover${full ? ' album-cover--full' : ''}" src="${esc(full ? c.src : c.thumb)}" alt="" width="${esc(Number(c.w) || 0)}" height="${esc(Number(c.h) || 0)}" loading="${full ? 'eager' : 'lazy'}" decoding="async"${bg} data-focus-src="${esc(c.thumb)}"${c.focus ? ` data-focus="${esc(c.focus.x)},${esc(c.focus.y)}"` : ''}>
       <div class="album-text">
         <${tag} class="album-name">${esc(a.name)}</${tag}>
         <p class="album-meta">${esc(albumMeta(a))}</p>
       </div>`;
   }
+
+  /* --- Cover focus: keep the subject in view when a cover is cropped to the banner or card shape.
+     The manifest may give a focus point per photo (0..1, from the manager app). Otherwise a tiny
+     saliency pass over the thumbnail measures where the detail and colour are, per row and column,
+     and the crop window with the most of it wins. Needs CORS on the bucket for pixel access;
+     without it the crop stays centred. --- */
+  const focusCache = new Map();   // thumb URL -> Promise<{ rows, cols } | null>
+
+  function analyseCover(url) {
+    if (focusCache.has(url)) return focusCache.get(url);
+    const job = new Promise(resolve => {
+      const im = new Image();
+      im.crossOrigin = 'anonymous';
+      im.decoding = 'async';
+      im.onload = () => {
+        try {
+          const W = 64, H = Math.max(8, Math.round(W * im.naturalHeight / im.naturalWidth));
+          const cv = document.createElement('canvas');
+          cv.width = W; cv.height = H;
+          const ctx = cv.getContext('2d', { willReadFrequently: true });
+          ctx.drawImage(im, 0, 0, W, H);
+          const d = ctx.getImageData(0, 0, W, H).data;
+          const lum = new Float32Array(W * H), sat = new Float32Array(W * H);
+          for (let i = 0; i < W * H; i++) {
+            const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+            const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+            lum[i] = 0.299 * r + 0.587 * g + 0.114 * b;
+            sat[i] = mx ? (mx - mn) / mx : 0;
+          }
+          const rows = new Float32Array(H), cols = new Float32Array(W);
+          for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+            const i = y * W + x;
+            const gx = lum[i + 1] - lum[i - 1], gy = lum[i + W] - lum[i - W];
+            const edge = Math.sqrt(gx * gx + gy * gy) / 255;
+            const w = edge * edge * 4 + sat[i] * 0.6;   // detail and colour both count
+            rows[y] += w; cols[x] += w;
+          }
+          resolve({ rows, cols });
+        } catch { resolve(null); } // canvas tainted (no CORS) or other failure: keep the centre
+      };
+      im.onerror = () => resolve(null);
+      im.src = url;
+    });
+    focusCache.set(url, job);
+    return job;
+  }
+
+  // Fraction (0..1) of the overflow to scroll so the window holding the most energy is visible.
+  // A gentle bias toward the middle breaks ties between similar windows.
+  function bestOffset(profile, visibleFraction) {
+    const n = profile.length, win = Math.max(1, Math.min(n, Math.round(visibleFraction * n)));
+    if (win >= n) return 0.5;
+    let sum = 0;
+    for (let i = 0; i < win; i++) sum += profile[i];
+    let best = 0, bestScore = -1;
+    for (let start = 0; ; start++) {
+      const centre = (start + win / 2) / n;
+      const score = sum * (1 - 0.2 * Math.abs(centre - 0.5));
+      if (score > bestScore) { bestScore = score; best = start; }
+      if (start + win >= n) break;
+      sum += profile[start + win] - profile[start];
+    }
+    return best / (n - win);
+  }
+
+  // object-position for this cover in its current box, from a focus point or the energy profiles
+  function applyFocus(img) {
+    const box = img.parentElement, f = img._focus;
+    if (!box || !f) return;
+    const iw = Number(img.getAttribute('width')) || img.naturalWidth, ih = Number(img.getAttribute('height')) || img.naturalHeight;
+    const cw = box.clientWidth, ch = box.clientHeight;
+    if (!iw || !ih || !cw || !ch) return;
+    const scale = Math.max(cw / iw, ch / ih);
+    const overX = iw * scale - cw, overY = ih * scale - ch;
+    let px = 50, py = 50;
+    if (f.point) {
+      if (overX > 1) px = clamp((f.point.x * iw * scale - cw / 2) / overX, 0, 1) * 100;
+      if (overY > 1) py = clamp((f.point.y * ih * scale - ch / 2) / overY, 0, 1) * 100;
+    } else {
+      if (overX > 1) px = bestOffset(f.cols, cw / (iw * scale)) * 100;
+      if (overY > 1) py = bestOffset(f.rows, ch / (ih * scale)) * 100;
+    }
+    const pos = `${px.toFixed(1)}% ${py.toFixed(1)}%`;
+    img.style.objectPosition = pos;
+    if (img.classList.contains('album-cover--full')) img.style.backgroundPosition = pos;
+  }
+
+  async function focusCovers(scope) {
+    for (const img of scope.querySelectorAll('.album-cover[data-focus-src]')) {
+      let f = null;
+      if (img.dataset.focus) { const [x, y] = img.dataset.focus.split(',').map(Number); if (x >= 0 && x <= 1 && y >= 0 && y <= 1) f = { point: { x, y } }; }
+      if (!f) f = await analyseCover(img.dataset.focusSrc);
+      if (f && img.isConnected) { img._focus = f; applyFocus(img); }
+    }
+  }
+  function refocusCovers() {
+    document.querySelectorAll('.album-cover[data-focus-src]').forEach(img => { if (img._focus) applyFocus(img); });
+  }
+  window.addEventListener('resize', refocusCovers);
 
   /* --- Featured belt: a conveyor of hand-picked photos at their real aspect ratio. It drifts
      slowly on its own, pauses while hovered or handled, and can be wheel-scrolled, dragged or
@@ -221,6 +353,7 @@
       ? `<div class="album-list">${albums.map(a => `
           <a class="album-card" href="#${esc(a.id)}" data-album="${esc(a.id)}">${bannerHTML(a, 'h2')}</a>`).join('')}</div>`
       : '<p class="photo-empty">Nothing here yet.</p>';
+    focusCovers(viewEl);
   }
 
   // Album view: banner with the name on top, then the grid
@@ -243,6 +376,7 @@
           <img src="${esc(p.thumb)}" alt="${esc(photoLabel(p, a, i))}" width="${esc(w)}" height="${esc(h)}" loading="lazy" decoding="async">
         </a>`; }).join('')}</div>`;
     grid = viewEl.querySelector('.photo-grid');
+    focusCovers(viewEl);
     layout();
     if (ro) ro.disconnect();
     ro = new ResizeObserver(layout);

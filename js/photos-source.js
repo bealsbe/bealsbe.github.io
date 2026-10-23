@@ -76,6 +76,12 @@ function manifestToData(m, base) {
   const thumbFor = p => PHOTO_SOURCE.thumb
     ? url(PHOTO_SOURCE.thumb.replace('{base}', base).replace('{src}', str(p.src).replace(/^\//, '')))
     : url(p.thumb || p.src);
+  // Optional subject point for cropped covers, {x, y} in 0..1 (set by the manager app, if ever)
+  const focusOf = f => {
+    if (!f || typeof f !== 'object') return null;
+    const x = Number(f.x), y = Number(f.y);
+    return Number.isFinite(x) && Number.isFinite(y) && x >= 0 && x <= 1 && y >= 0 && y <= 1 ? { x, y } : null;
+  };
   const exifOf = x => {
     if (!x || typeof x !== 'object') return null;
     const out = {};
@@ -94,6 +100,7 @@ function manifestToData(m, base) {
         title: str(p.title).slice(0, 200),
         caption: str(p.caption).slice(0, 1000),
         w, h, src, thumb,
+        focus: focusOf(p.focus),
         exif: exifOf(p.exif),
       };
     }).filter(Boolean);
