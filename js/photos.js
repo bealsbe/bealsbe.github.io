@@ -214,24 +214,39 @@
   window.addEventListener('resize', refocusCovers);
 
   /* --- Featured belt: a conveyor of hand-picked photos at their real aspect ratio. It drifts
-     slowly on its own, pauses while hovered or handled, and can be wheel-scrolled, dragged or
-     swiped like any strip. The set is repeated so it loops without a visible seam. --- */
-  const BELT_SPEED = 26;  // px per second
-  const belt = { items: [], el: null, track: null, copies: 1, pos: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false };
+     slowly on its own, eases to a stop while hovered or handled, and can be wheel-scrolled,
+     dragged or swiped like any strip. The set is repeated so it loops without a visible seam.
+     The drift is a compositor-run transform animation on the track, so it stays smooth even when
+     the main thread is busy; user scrolling moves the native scroller underneath it. --- */
+  const BELT_SPEED = 20;  // px per second
+  const belt = { items: [], el: null, track: null, copies: 1, anim: null, rate: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false };
 
+  // The set is shuffled once per page load and keeps that order until the frontend reloads
+  let featuredOrder = null;
   function featuredItems() {
-    return (typeof PHOTO_FEATURED !== 'undefined' ? PHOTO_FEATURED : []).map(f => {
+    const items = (typeof PHOTO_FEATURED !== 'undefined' ? PHOTO_FEATURED : []).map(f => {
       const album = albumById.get(f.album);
       const photo = album && album.photos.find(p => p.id === f.photo);
       return photo ? { album, photo } : null;
     }).filter(Boolean);
+    const key = it => it.album.id + '/' + it.photo.id;
+    if (!featuredOrder) {
+      for (let i = items.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [items[i], items[j]] = [items[j], items[i]];
+      }
+      featuredOrder = new Map(items.map((it, i) => [key(it), i]));
+    }
+    const rank = it => featuredOrder.has(key(it)) ? featuredOrder.get(key(it)) : Infinity;
+    return items.sort((a, b) => rank(a) - rank(b));
   }
 
   function beltItemHTML({ album, photo }, copy) {
     const w = Number(photo.w) || 3, h = Number(photo.h) || 2;
+    // Every copy loads eagerly: the thumbnails are small and shared, and a lazy copy would pop in mid-drift
     return `
       <a class="belt-item" href="${esc(hashFor(album.id, photo.id))}" data-album="${esc(album.id)}" data-photo="${esc(photo.id)}" style="aspect-ratio: ${w} / ${h}"${copy ? ' aria-hidden="true" tabindex="-1"' : ''}>
-        <img src="${esc(photo.thumb)}" alt="${esc(photoLabel(photo, album, -1))}" width="${w}" height="${h}" loading="${copy ? 'lazy' : 'eager'}" decoding="async">
+        <img src="${esc(photo.thumb)}" alt="${esc(photoLabel(photo, album, -1))}" width="${w}" height="${h}" decoding="async">
         <span class="belt-caption"><span class="belt-title">${esc(photo.title || album.name)}</span>${photo.title ? `<span class="belt-album">${esc(album.name)}</span>` : ''}</span>
       </a>`;
   }
@@ -244,7 +259,6 @@
     if (!belt.items.length) { featuredEl.innerHTML = ''; return; }
     featuredEl.innerHTML = `
       <section class="belt-section" aria-label="Featured photos">
-        <span class="belt-label">Featured</span>
         <div class="belt">
           <div class="belt-track">${belt.items.map(it => beltItemHTML(it, 0)).join('')}</div>
         </div>
@@ -255,92 +269,125 @@
     fillBelt();
 
     const el = belt.el;
-    el.addEventListener('mouseenter', () => { belt.hover = true; });
-    el.addEventListener('mouseleave', () => { belt.hover = false; });
-    el.addEventListener('focusin', () => { belt.hover = true; });
-    el.addEventListener('focusout', e => { if (!el.contains(e.relatedTarget)) belt.hover = false; });
+    el.addEventListener('mouseenter', () => { belt.hover = true; beltStart(); });
+    el.addEventListener('mouseleave', () => { belt.hover = false; beltStart(); });
+    el.addEventListener('focusin', () => { belt.hover = true; beltStart(); });
+    el.addEventListener('focusout', e => { if (!el.contains(e.relatedTarget)) { belt.hover = false; beltStart(); } });
     el.addEventListener('wheel', () => beltHold(2500), { passive: true });
     el.addEventListener('touchstart', () => beltHold(4000), { passive: true });
     el.addEventListener('touchend', () => beltHold(2500), { passive: true });
-    // A scroll we didn't cause (wheel, touch, keyboard, drag) becomes the new position
-    el.addEventListener('scroll', () => {
-      if (Math.abs(el.scrollLeft - Math.round(belt.pos)) > 1) belt.pos = el.scrollLeft;
-      wrapBelt();
-    }, { passive: true });
+    el.addEventListener('scroll', wrapBelt, { passive: true });
     // Mouse drag scrolls the strip. No pointer capture: it would retarget the click to the strip
     // and the photo under the pointer would no longer open.
     el.addEventListener('pointerdown', e => {
       if (e.pointerType !== 'mouse' || e.button !== 0) return;
       belt.drag = { x: e.clientX, from: el.scrollLeft };
       belt.dragged = false;
+      beltStart();
       e.preventDefault(); // no native image/link drag
     });
     beltStart();
   }
 
-  // Repeat the set until the strip can scroll freely in both directions, then start in the middle copy
+  const setWidth = () => belt.track ? belt.track.scrollWidth / belt.copies : 0;
+
+  // Repeat the set until the strip can show any scroll position plus a full set of drift without
+  // running out of photos, start in the middle copy, and (re)build the drift animation for this width
   function fillBelt() {
     const el = belt.el, track = belt.track;
     if (!el || !track) return;
-    const one = track.scrollWidth;
+    const one = setWidth();
     if (!one) return;
-    const need = Math.max(3, Math.ceil((el.clientWidth * 2) / one) + 1);
+    const need = Math.ceil(2.5 + (el.clientWidth + 400) / one); // +400px covers a fling's overshoot before it wraps
     if (need > belt.copies) {
       track.insertAdjacentHTML('beforeend', Array.from({ length: need - belt.copies }, () => belt.items.map(it => beltItemHTML(it, 1)).join('')).join(''));
       belt.copies = need;
     }
-    belt.pos = setWidth();
-    el.scrollLeft = belt.pos;
+    el.scrollLeft = setWidth();
+    buildDrift();
   }
 
-  const setWidth = () => belt.track ? belt.track.scrollWidth / belt.copies : 0;
-
-  // Keep the position inside the middle copy; the strip looks the same one set left or right
-  function wrapBelt() {
+  // One set's worth of travel, repeated forever: at the end of a loop the track snaps back by
+  // exactly one set, which looks identical. The animation is kept paused when the strip should
+  // be still and its playback rate is eased between 0 and 1 by beltTick.
+  function buildDrift() {
     const one = setWidth();
-    if (!one) return;
-    if (belt.pos < one * 0.5) { belt.pos += one; belt.el.scrollLeft = belt.pos; }
-    else if (belt.pos >= one * 1.5) { belt.pos -= one; belt.el.scrollLeft = belt.pos; }
+    if (!belt.track || !one || typeof belt.track.animate !== 'function') return;
+    const progress = belt.anim && belt.anim.effect ? (belt.anim.currentTime || 0) / belt.anim.effect.getTiming().duration : 0;
+    if (belt.anim) belt.anim.cancel();
+    belt.anim = belt.track.animate(
+      [{ transform: 'translate3d(0, 0, 0)' }, { transform: `translate3d(${-one}px, 0, 0)` }],
+      { duration: (one / BELT_SPEED) * 1000, iterations: Infinity, easing: 'linear' }
+    );
+    belt.anim.currentTime = (progress % 1) * (one / BELT_SPEED) * 1000;
+    belt.anim.playbackRate = belt.rate;
+    if (!belt.rate) belt.anim.pause();
   }
 
+  // Keep the scroller inside the middle copy; the strip looks the same one set left or right
+  function wrapBelt() {
+    const one = setWidth(), el = belt.el;
+    if (!one || !el) return;
+    let shift = 0;
+    if (el.scrollLeft < one * 0.5) shift = one;
+    else if (el.scrollLeft >= one * 1.5) shift = -one;
+    if (!shift) return;
+    el.scrollLeft += shift;
+    if (belt.drag) belt.drag.from += shift;
+  }
+
+  const beltWantsMotion = () => !belt.hover && !belt.drag && performance.now() > belt.hold && !document.hidden && !reduceMotion.matches;
+
+  // Ease the playback rate toward 1 (drifting) or 0 (still) so the strip glides to a stop and
+  // picks up again instead of jerking. The loop only runs while the rate is changing or a hold
+  // is pending.
   function beltTick(now) {
     belt.raf = 0;
-    if (!belt.el || !belt.el.isConnected) return;
+    if (!belt.el || !belt.el.isConnected || !belt.anim) return;
     const dt = Math.min(0.1, (now - belt.last) / 1000);
     belt.last = now;
-    const moving = !belt.hover && !belt.drag && now > belt.hold && !document.hidden && !reduceMotion.matches;
-    if (moving) {
-      belt.pos += BELT_SPEED * dt;
-      wrapBelt();
-      const next = Math.round(belt.pos);
-      if (next !== belt.el.scrollLeft) belt.el.scrollLeft = next;
+    const target = beltWantsMotion() ? 1 : 0;
+    const k = 1 - Math.exp(-dt * (target ? 3 : 6)); // ~0.3s to ease in, ~0.15s to ease out
+    let rate = belt.rate + (target - belt.rate) * k;
+    if (Math.abs(target - rate) < 0.01) rate = target;
+    if (rate !== belt.rate) {
+      belt.rate = rate;
+      if (rate && belt.anim.playState === 'paused') belt.anim.play();
+      // updatePlaybackRate changes speed in step with the compositor, so there is no hitch
+      if (belt.anim.updatePlaybackRate) belt.anim.updatePlaybackRate(rate); else belt.anim.playbackRate = rate;
+      if (!rate) belt.anim.pause();
     }
-    belt.raf = requestAnimationFrame(beltTick);
+    const settled = rate === target && (target === 1 || performance.now() > belt.hold);
+    if (!settled) belt.raf = requestAnimationFrame(beltTick);
   }
   function beltStart() {
     if (!belt.el || belt.raf) return;
+    // After a stop (an album was open, which also hides the strip and drops its scroll position)
+    // the strip is re-centred and the drift rebuilt
+    if (!belt.anim && belt.track && typeof belt.track.animate === 'function') fillBelt();
     belt.last = performance.now();
     belt.raf = requestAnimationFrame(beltTick);
   }
   function beltStop() {
     if (belt.raf) cancelAnimationFrame(belt.raf);
     belt.raf = 0;
+    if (belt.anim) { belt.anim.cancel(); belt.anim = null; }
+    belt.rate = 0;
   }
-  const beltHold = ms => { belt.hold = Math.max(belt.hold, performance.now() + ms); };
+  const beltHold = ms => { belt.hold = Math.max(belt.hold, performance.now() + ms); beltStart(); };
 
   window.addEventListener('pointermove', e => {
     if (!belt.drag || !belt.el) return;
     const dx = e.clientX - belt.drag.x;
     if (Math.abs(dx) > 4) { belt.dragged = true; belt.el.classList.add('is-dragging'); }
     belt.el.scrollLeft = belt.drag.from - dx;
-    belt.pos = belt.el.scrollLeft;
   });
   const endBeltDrag = () => { if (!belt.drag) return; belt.drag = null; belt.el && belt.el.classList.remove('is-dragging'); beltHold(1500); };
   window.addEventListener('pointerup', endBeltDrag);
   window.addEventListener('pointercancel', endBeltDrag);
 
-  document.addEventListener('visibilitychange', () => { if (document.hidden) beltStop(); else if (!currentAlbum) beltStart(); });
-  window.addEventListener('resize', () => { if (belt.el) { belt.copies = belt.copies; fillBelt(); } });
+  document.addEventListener('visibilitychange', () => { if (!currentAlbum) beltStart(); });
+  window.addEventListener('resize', () => { if (belt.el) fillBelt(); });
 
   // Section view: one banner per album (folder), newest first
   function renderList() {

@@ -68,6 +68,11 @@
   transition: opacity 150ms ease;
 }
 
+/* While the manifest is still loading, keep the card from collapsing to just the heading */
+.photo-view:empty {
+  min-height: 60vh;
+}
+
 .photo-view.is-switching {
   opacity: 0;
 }
@@ -91,18 +96,9 @@
   }
 }
 
-.belt-label {
-  display: block;
-  font-family: 'Press Start 2P', monospace;
-  font-size: 0.6rem;
-  color: var(--accent);
-  letter-spacing: 0.08em;
-  margin: 0 0 12px;
-}
-
 /* The strip: scrolls like any horizontal list; the scrollbar is hidden and the ends fade out */
 .belt {
-  --belt-h: 180px;
+  --belt-h: 160px;
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
@@ -116,7 +112,7 @@
 
 @media (min-width: 700px) {
   .belt {
-    --belt-h: 300px;
+    --belt-h: 260px;
   }
 }
 
@@ -132,6 +128,7 @@
   display: flex;
   gap: 8px;
   width: max-content;
+  will-change: transform; /* the drift nudges the track by fractions of a pixel every frame */
 }
 
 /* Each item takes its photo's aspect ratio at the strip height, so nothing is cropped */

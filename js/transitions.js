@@ -110,6 +110,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     await Promise.race([Promise.all(pending), wait(1500)]);
 
+    // The photography page fetches its data; wait for it (briefly) so the morph lands on the real
+    // content instead of an empty card that then pops to full height
+    if (newCard.classList.contains('photo-card') && typeof PHOTO_DATA_READY !== 'undefined') {
+      await Promise.race([PHOTO_DATA_READY, wait(2500)]);
+    }
+
     const swap = () => {
       // Push state BEFORE swapping card so relative image URLs in the new card
       // resolve against the correct base URL (not the previous page's URL).
