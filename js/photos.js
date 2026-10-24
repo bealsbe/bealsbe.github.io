@@ -236,7 +236,7 @@
   function featuredItems() {
     const items = (typeof PHOTO_FEATURED !== 'undefined' ? PHOTO_FEATURED : []).map(f => {
       const album = albumById.get(f.album);
-      const photo = album && album.photos.find(p => p.id === f.photo);
+      const photo = album && !album.unlisted && album.photos.find(p => p.id === f.photo);
       return photo ? { album, photo } : null;
     }).filter(Boolean);
     const key = it => it.album.id + '/' + it.photo.id;
@@ -497,7 +497,7 @@
     root.classList.remove('in-album');
     if (featuredEl && !featuredEl.children.length) renderFeatured();
     else beltStart();
-    const albums = PHOTO_ALBUMS.filter(a => a.section === section).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const albums = PHOTO_ALBUMS.filter(a => a.section === section && !a.unlisted).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     viewEl.innerHTML = albums.length
       ? `<div class="album-list">${albums.map(a => `
           <a class="album-card" href="#${esc(a.id)}" data-album="${esc(a.id)}">${bannerHTML(a, 'h2')}</a>`).join('')}</div>`
@@ -509,13 +509,12 @@
   function renderAlbum(a) {
     currentAlbum = a;
     shown = gridPhotos(a);
-    section = a.section;
-    updateChips();
+    if (!a.unlisted) { section = a.section; updateChips(); } // unlisted albums belong to no section
     root.classList.add('in-album');
     beltStop();
     viewEl.innerHTML = `
       <div class="album-banner">
-        <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(sectionName(a.section))}</a>
+        <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(a.unlisted ? 'Photography' : sectionName(a.section))}</a>
         ${bannerHTML(a, 'h2', true)}
       </div>
       <div class="photo-grid">${shown.map((p, i) => {
@@ -578,13 +577,38 @@
   }
 
   // --- hash routing ---
+  // #<album>, #<album>/<photo>, and for private albums #u/<folder> and #u/<folder>/<photo>
   function parseHash() {
-    const m = location.hash.match(/^#([^/]+)(?:\/([^/]+))?$/);
+    const m = location.hash.match(/^#(u\/[a-z0-9-]+|[^/]+)(?:\/([^/]+))?$/);
     return m ? { album: m[1], photo: m[2] || null } : { album: null, photo: null };
   }
   const hashFor = (albumId, photoId) => albumId ? '#' + albumId + (photoId ? '/' + photoId : '') : location.pathname + location.search;
 
+  // A private album is fetched the first time its link is opened, then routed like any other
+  const privateLoads = new Map();
+  function loadPrivate(r) {
+    const id = r.album;
+    if (!privateLoads.has(id)) privateLoads.set(id, typeof loadPrivateAlbum === 'function' ? loadPrivateAlbum(id.slice(2)) : Promise.resolve(null));
+    if (!viewEl.children.length) viewEl.innerHTML = '<p class="photo-empty">Loading album…</p>';
+    privateLoads.get(id).then(a => {
+      if (!root || !root.isConnected || parseHash().album !== id) return; // navigated away meanwhile
+      if (!a) {
+        privateLoads.delete(id); // allow a retry
+        renderList();
+        viewEl.insertAdjacentHTML('afterbegin', '<p class="photo-empty">That album link isn’t valid, or the album is no longer shared.</p>');
+        return;
+      }
+      albumById.set(id, a);
+      if (r.photo && !isOpen) { // deep link to a photo: Back returns to the album grid
+        history.replaceState(null, '', hashFor(id, null));
+        history.pushState({ viewer: true }, '', hashFor(id, r.photo));
+      }
+      applyRoute(parseHash(), { animate: false });
+    });
+  }
+
   function applyRoute(r, { animate = true } = {}) {
+    if (r.album && r.album.startsWith('u/') && !albumById.has(r.album)) { loadPrivate(r); return; }
     const album = r.album ? albumById.get(r.album) : null;
     const photo = album && r.photo ? album.photos.find(p => p.id === r.photo) : null;
     if (album !== currentAlbum || !viewEl.children.length) {

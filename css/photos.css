@@ -234,7 +234,7 @@
 }
 
 .album-card {
-  aspect-ratio: 2 / 1;
+  aspect-ratio: 5 / 3;
 }
 
 /* Hero banner: bleeds past the card padding to the card's own edges, with the name over a
@@ -318,6 +318,13 @@
   gap: 8px;
   pointer-events: none;
 }
+
+/* Album list cards: text sits at the bottom, gradient darkens from the bottom */
+.album-card .album-text {
+  justify-content: flex-end;
+  background: linear-gradient(to top, rgba(5, 5, 9, 0.78) 0%, rgba(5, 5, 9, 0.35) 40%, rgba(5, 5, 9, 0) 70%);
+}
+
 
 .album-name {
   font-family: 'Press Start 2P', monospace;

@@ -22,6 +22,9 @@ const PHOTO_SOURCE = {
   thumb: null,
 };
 
+// Where the active manifest lives; private album manifests are fetched relative to it
+let photoBase = PHOTO_SOURCE.base;
+
 // Resolves once PHOTO_SECTIONS / PHOTO_ALBUMS are final. js/photos.js waits on it.
 const PHOTO_DATA_READY = (async () => {
   let override = null;
@@ -34,13 +37,13 @@ const PHOTO_DATA_READY = (async () => {
   let url = null;
   if (override && override !== 'default') url = allowedManifestURL(override);
   if (!url) url = PHOTO_SOURCE.base + PHOTO_SOURCE.manifest;
+  photoBase = url === PHOTO_SOURCE.base + PHOTO_SOURCE.manifest ? PHOTO_SOURCE.base : url.replace(/[^/]*$/, '');  // url is already origin-checked
 
   try {
     const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const m = await res.json();
-    const base = url === PHOTO_SOURCE.base + PHOTO_SOURCE.manifest ? PHOTO_SOURCE.base : url.replace(/[^/]*$/, '');  // url is already origin-checked
-    const data = manifestToData(m, base);
+    const data = manifestToData(m, photoBase);
     window.PHOTO_SECTIONS = data.sections;
     window.PHOTO_ALBUMS = data.albums;
     window.PHOTO_FEATURED = data.featured;
@@ -65,6 +68,37 @@ function allowedManifestURL(raw) {
 // strings are coerced, numbers bounded, and URLs resolved against the bucket and limited to http(s).
 function manifestToData(m, base) {
   if (!m || m.version !== 1 || !Array.isArray(m.albums) || !Array.isArray(m.sections)) throw new Error('unexpected manifest shape');
+  const { str, album } = photoNormaliser(base);
+  const sections = m.sections.map(s => ({ id: str(s.id), name: str(s.name) || str(s.id) })).filter(s => s.id);
+  const albums = m.albums.map(album).filter(a => a.id && a.photos.length);
+  // Slider entries: keep only those that point at a listed album photo that survived the checks
+  const featured = (Array.isArray(m.featured) ? m.featured : []).map(f => ({ album: str(f && f.album), photo: str(f && f.photo) }))
+    .filter(f => { const a = albums.find(x => x.id === f.album); return a && !a.unlisted && a.photos.some(p => p.id === f.photo); });
+  return { sections, albums, featured };
+}
+
+/* Private albums live in the bucket's private/ folder, are not in the main manifest, and each has
+   its own private/<folder>/manifest.json ({ version: 1, album }). The folder name ends in a random
+   token, so the link (#u/<folder>) is the only way to find one. Resolves to the album or null. */
+async function loadPrivateAlbum(folder) {
+  if (!/^[a-z0-9][a-z0-9-]{0,160}$/.test(folder)) return null;
+  try {
+    const res = await fetch(`${photoBase}private/${folder}/manifest.json`, { cache: 'no-cache' });
+    if (!res.ok) return null;
+    const m = await res.json();
+    if (!m || m.version !== 1 || !m.album || typeof m.album !== 'object') return null;
+    const a = photoNormaliser(photoBase).album(m.album);
+    if (!a.photos.length) return null;
+    a.id = 'u/' + folder;   // the route id, whatever the file says
+    a.unlisted = true;
+    a.private = true;
+    return a;
+  } catch { return null; }
+}
+
+// Everything in a manifest is treated as untrusted: strings are coerced, numbers bounded, and URLs
+// resolved against the bucket and limited to http(s).
+function photoNormaliser(base) {
   const str = v => (v === undefined || v === null) ? '' : String(v);
   const num = v => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 100000 ? n : 0; };
   const url = p => {
@@ -89,8 +123,7 @@ function manifestToData(m, base) {
     return Object.keys(out).length ? out : null;
   };
 
-  const sections = m.sections.map(s => ({ id: str(s.id), name: str(s.name) || str(s.id) })).filter(s => s.id);
-  const albums = m.albums.map(a => {
+  const album = a => {
     const photos = (Array.isArray(a.photos) ? a.photos : []).map(p => {
       const w = num(p.w), h = num(p.h), src = url(p.src), thumb = thumbFor(p);
       if (!str(p.id) || !w || !h || !src || !thumb) return null;   // skip anything the grid can't lay out
@@ -113,11 +146,10 @@ function manifestToData(m, base) {
       location: str(a.location).slice(0, 200),
       description: str(a.description).slice(0, 1000),
       cover: str(a.cover),
+      // Unlisted albums (bucket folder unlisted/) open by URL but never appear in lists or the strip
+      unlisted: a.unlisted === true || str(a.section) === 'unlisted' || str(a.section) === 'private',
       photos,
     };
-  }).filter(a => a.id && a.photos.length);
-  // Slider entries: keep only those that point at an album photo that survived the checks above
-  const featured = (Array.isArray(m.featured) ? m.featured : []).map(f => ({ album: str(f && f.album), photo: str(f && f.photo) }))
-    .filter(f => { const a = albums.find(x => x.id === f.album); return a && a.photos.some(p => p.id === f.photo); });
-  return { sections, albums, featured };
+  };
+  return { str, album };
 }
