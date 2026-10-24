@@ -227,6 +227,7 @@
   const BELT_GAP = 8;       // px between photos, matches .belt-track's spacing in the CSS
   const BELT_RUN = 200000;  // px each photo's animation covers before it would ever end
   const TRACK_SPAN = 16;    // scroller content is this many viewports wide, re-centred as you near an end
+  const BELT_MAX = 50;      // photos in one strip; the per-load shuffle picks which 50 when there are more
   const belt = { items: [], el: null, track: null, placed: [], height: 0, trackW: 0, rate: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false, preloaded: false };
 
   // The set is shuffled once per page load and keeps that order until the frontend reloads
@@ -246,7 +247,7 @@
       featuredOrder = new Map(items.map((it, i) => [key(it), i]));
     }
     const rank = it => featuredOrder.has(key(it)) ? featuredOrder.get(key(it)) : Infinity;
-    return items.sort((a, b) => rank(a) - rank(b));
+    return items.sort((a, b) => rank(a) - rank(b)).slice(0, BELT_MAX);
   }
 
   const beltItemWidth = ({ photo }) => belt.height * ((Number(photo.w) || 3) / (Number(photo.h) || 2));
@@ -297,7 +298,7 @@
       e.preventDefault(); // no native image/link drag
     });
 
-    if (!belt.preloaded) { // warm the cache so photos never pop in as they arrive from the right
+    if (!belt.preloaded) { // warm the cache for the chosen set so photos never pop in as they arrive
       belt.preloaded = true;
       for (const { photo } of belt.items) { const im = new Image(); im.decoding = 'async'; im.src = photo.thumb; }
     }
@@ -316,6 +317,7 @@
     const copy = belt.placed.some(o => o.idx === idx);
     const el = beltItemEl(item, w, copy);
     if (atFront) belt.track.prepend(el); else belt.track.append(el);
+
     const placed = { idx, el, w, startX: x, anim: null };
     if (typeof el.animate === 'function') {
       const anim = placed.anim = el.animate(
