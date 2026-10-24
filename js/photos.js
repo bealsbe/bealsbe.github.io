@@ -227,8 +227,9 @@
   const BELT_GAP = 8;       // px between photos, matches .belt-track's spacing in the CSS
   const BELT_RUN = 200000;  // px each photo's animation covers before it would ever end
   const TRACK_SPAN = 16;    // scroller content is this many viewports wide, re-centred as you near an end
-  const BELT_MAX = 50;      // photos in one strip; the per-load shuffle picks which 50 when there are more
-  const belt = { items: [], el: null, track: null, placed: [], height: 0, trackW: 0, rate: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false, preloaded: false };
+  const BELT_MAX = 100;     // safety ceiling; every featured photo stays in rotation below it
+  const BELT_AHEAD = 3;     // photos fetched ahead of the last one placed in each direction
+  const belt = { items: [], el: null, track: null, placed: [], height: 0, trackW: 0, rate: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false, warmed: new Map() };
 
   // The set is shuffled once per page load and keeps that order until the frontend reloads
   let featuredOrder = null;
@@ -298,11 +299,24 @@
       e.preventDefault(); // no native image/link drag
     });
 
-    if (!belt.preloaded) { // warm the cache for the chosen set so photos never pop in as they arrive
-      belt.preloaded = true;
-      for (const { photo } of belt.items) { const im = new Image(); im.decoding = 'async'; im.src = photo.thumb; }
-    }
     beltStart();
+  }
+
+  // Thumbnails are fetched lazily: a photo's own <img> loads when it is placed (already a margin
+  // outside the viewport, so many seconds ahead of the drift), and each placement also warms the
+  // next few photos in the direction the strip is growing, so a scroll finds them cached. Each
+  // URL is fetched once per page; the Image objects are kept so the browser holds them decoded.
+  function warmBeltThumb(photo) {
+    const src = photo.thumb;
+    if (!src || belt.warmed.has(src)) return;
+    const im = new Image();
+    im.decoding = 'async';
+    im.src = src;
+    belt.warmed.set(src, im);
+  }
+  function warmBeltAhead(idx, dir) {
+    const n = belt.items.length;
+    for (let k = 1; k <= Math.min(BELT_AHEAD, n - 1); k++) warmBeltThumb(belt.items[((idx + dir * k) % n + n) % n].photo);
   }
 
   // Where a placed photo is right now, in scroller coordinates
@@ -317,6 +331,8 @@
     const copy = belt.placed.some(o => o.idx === idx);
     const el = beltItemEl(item, w, copy);
     if (atFront) belt.track.prepend(el); else belt.track.append(el);
+    if (!belt.warmed.has(item.photo.thumb)) belt.warmed.set(item.photo.thumb, null); // its <img> is fetching it
+    warmBeltAhead(idx, atFront ? -1 : 1);
 
     const placed = { idx, el, w, startX: x, anim: null };
     if (typeof el.animate === 'function') {
