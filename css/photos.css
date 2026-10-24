@@ -98,7 +98,7 @@
 
 /* The strip: scrolls like any horizontal list; the scrollbar is hidden and the ends fade out */
 .belt {
-  --belt-h: 160px;
+  --belt-h: 140px;
   position: relative;
   overflow-x: auto;
   overflow-y: hidden;
@@ -112,7 +112,7 @@
 
 @media (min-width: 700px) {
   .belt {
-    --belt-h: 260px;
+    --belt-h: 230px;
   }
 }
 
@@ -234,7 +234,7 @@
 }
 
 .album-card {
-  aspect-ratio: 5 / 3;
+  aspect-ratio: 16 / 9;
 }
 
 /* Hero banner: bleeds past the card padding to the card's own edges, with the name over a

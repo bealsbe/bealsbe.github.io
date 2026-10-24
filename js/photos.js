@@ -514,7 +514,7 @@
     beltStop();
     viewEl.innerHTML = `
       <div class="album-banner">
-        <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(a.unlisted ? 'Photography' : sectionName(a.section))}</a>
+        <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(a.unlisted ? 'Back' : sectionName(a.section))}</a>
         ${bannerHTML(a, 'h2', true)}
       </div>
       <div class="photo-grid">${shown.map((p, i) => {
