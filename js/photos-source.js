@@ -13,6 +13,7 @@
 var PHOTO_SECTIONS = [];
 var PHOTO_ALBUMS = [];
 var PHOTO_FEATURED = [];
+var PHOTO_ALIASES = {};   // old album id -> the album it was merged into
 
 const PHOTO_SOURCE = {
   base: 'https://photos.beals.link/',        // bucket public URL (R2 custom domain), trailing slash
@@ -47,6 +48,7 @@ const PHOTO_DATA_READY = (async () => {
     window.PHOTO_SECTIONS = data.sections;
     window.PHOTO_ALBUMS = data.albums;
     window.PHOTO_FEATURED = data.featured;
+    window.PHOTO_ALIASES = data.aliases;
     return 'manifest';
   } catch (e) {
     console.warn('Photo manifest unavailable:', url, e.message);
@@ -69,12 +71,21 @@ function allowedManifestURL(raw) {
 function manifestToData(m, base) {
   if (!m || m.version !== 1 || !Array.isArray(m.albums) || !Array.isArray(m.sections)) throw new Error('unexpected manifest shape');
   const { str, album } = photoNormaliser(base);
-  const sections = m.sections.map(s => ({ id: str(s.id), name: str(s.name) || str(s.id) })).filter(s => s.id);
+  // hideDates: leave the date off this section's album cards (the album page still shows it)
+  const sections = m.sections.map(s => ({ id: str(s.id), name: str(s.name) || str(s.id), hideDates: s.hide_dates === true })).filter(s => s.id);
   const albums = m.albums.map(album).filter(a => a.id && a.photos.length);
   // Slider entries: keep only those that point at a listed album photo that survived the checks
   const featured = (Array.isArray(m.featured) ? m.featured : []).map(f => ({ album: str(f && f.album), photo: str(f && f.photo) }))
     .filter(f => { const a = albums.find(x => x.id === f.album); return a && !a.unlisted && a.photos.some(p => p.id === f.photo); });
-  return { sections, albums, featured };
+  // Merged albums: old id -> id of an album that exists
+  const aliases = {};
+  const idOk = v => typeof v === 'string' && /^[a-z0-9-]{1,160}$/.test(v);
+  if (m.aliases && typeof m.aliases === 'object') {
+    for (const [from, to] of Object.entries(m.aliases)) {
+      if (idOk(from) && idOk(to) && albums.some(a => a.id === to) && !albums.some(a => a.id === from)) aliases[from] = to;
+    }
+  }
+  return { sections, albums, featured, aliases };
 }
 
 /* Private albums live in the bucket's private/ folder, are not in the main manifest, and each has
@@ -86,6 +97,10 @@ async function loadPrivateAlbum(folder) {
     const res = await fetch(`${photoBase}private/${folder}/manifest.json`);
     if (!res.ok) return null;
     const m = await res.json();
+    // A private album that was published leaves a redirect stub: { version: 1, moved: { album: <id> } }
+    if (m && m.version === 1 && m.moved && typeof m.moved.album === 'string' && /^[a-z0-9-]{1,160}$/.test(m.moved.album)) {
+      return { moved: m.moved.album };
+    }
     if (!m || m.version !== 1 || !m.album || typeof m.album !== 'object') return null;
     const a = photoNormaliser(photoBase).album(m.album);
     if (!a.photos.length) return null;
@@ -120,6 +135,8 @@ function photoNormaliser(base) {
     if (!x || typeof x !== 'object') return null;
     const out = {};
     for (const k of ['camera', 'lens', 'focal', 'aperture', 'shutter', 'iso']) if (x[k] !== undefined && x[k] !== null && x[k] !== '') out[k] = str(x[k]).slice(0, 120);
+    // date taken, as the camera wrote it (its local time, no zone); anything else is dropped
+    if (typeof x.taken === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,6})?)?$/.test(x.taken)) out.taken = x.taken;
     return Object.keys(out).length ? out : null;
   };
 

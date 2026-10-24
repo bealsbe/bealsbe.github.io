@@ -16,6 +16,34 @@
   const looksLikeFilename = t => /^[A-Za-z]{0,5}\d{3,}[A-Za-z]{0,2}$/.test(String(t || '').replace(/[\s_-]+/g, ''));
   const photoLabel   = (p, album, i) => p.title || (album ? `${album.name}${i >= 0 ? ` · ${i + 1}` : ''}` : '');
   const gridPhotos   = a => a.photos.filter(p => p.id !== '_cover'); // a cover.jpg is banner-only
+  const takenOf      = p => (p.exif && p.exif.taken) || '';         // "2026-09-26T12:28:13", camera local time
+
+  // An album's photos newest first by date taken (undated ones keep their order, after the rest),
+  // grouped by calendar day. One group when nothing is dated.
+  function photosByDay(a) {
+    const list = gridPhotos(a);
+    if (!list.some(takenOf)) return [{ day: '', photos: list }];
+    const sorted = list.map((p, i) => [p, i]).sort(([p, i], [q, j]) => {
+      const x = takenOf(p), y = takenOf(q);
+      if (x && y && x !== y) return x < y ? 1 : -1;
+      if (!x !== !y) return x ? -1 : 1;
+      return i - j;
+    });
+    const days = [];
+    for (const [p] of sorted) {
+      const day = takenOf(p).slice(0, 10);
+      if (!days.length || days[days.length - 1].day !== day) days.push({ day, photos: [] });
+      days[days.length - 1].photos.push(p);
+    }
+    return days;
+  }
+
+  // "Saturday, 26 September" (the year too when the album spans more than one)
+  function dayTitle(day, withYear) {
+    if (!day) return 'Date unknown';
+    const [y, m, d] = day.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', ...(withYear ? { year: 'numeric' } : {}) });
+  }
 
   /* ======================= Page: sections, album list, album grid ======================= */
   const GAP = 8;
@@ -32,8 +60,13 @@
   // heights stay as close to the target as possible (a linear partition over the tiles, so the
   // last row is as full as any other). Only an album with too few photos to fill a row at a sane
   // height falls back to a short, left-aligned last row.
+  // Each day's grid is justified on its own
   function layout() {
     if (!grid || !grid.isConnected) return;
+    for (const g of grid.querySelectorAll('.photo-grid')) layoutGrid(g);
+  }
+
+  function layoutGrid(grid) {
     // Fractional width floored: clientWidth rounds up, and a row a hair wider than the real box
     // wraps its last tile to the next line (seen at 125% display scaling)
     const width = Math.floor(grid.getBoundingClientRect().width);
@@ -95,8 +128,35 @@
     if (start < n) place(start, n, Math.min(rowHeight(n - start, sum), target * 1.15), true);
   }
 
-  const albumMeta = a => [
-    a.date && fmtDate(a.date, { year: 'numeric', month: 'short' }),
+  // First and last day its photos were taken ("YYYY-MM-DD"), or null when none are dated
+  function takenRange(a) {
+    let first = '', last = '';
+    for (const p of gridPhotos(a)) {
+      const d = takenOf(p).slice(0, 10);
+      if (!d) continue;
+      if (!first || d < first) first = d;
+      if (!last || d > last) last = d;
+    }
+    return first ? [first, last] : null;
+  }
+  const dayDate = d => { const [y, m, dd] = d.split('-').map(Number); return new Date(y, m - 1, dd); };
+
+  // "Jul 23 – 25, 2026", "Jul 30 – Aug 2, 2026", "Jul 25, 2026"; the album's own month when its
+  // photos carry no dates yet
+  function albumWhen(a) {
+    const r = takenRange(a);
+    if (!r) return a.date ? fmtDate(a.date, { year: 'numeric', month: 'short' }) : '';
+    const fmt = new Intl.DateTimeFormat(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    const [first, last] = r.map(dayDate);
+    if (r[0] === r[1]) return fmt.format(first);
+    try { return fmt.formatRange(first, last); } catch { return `${fmt.format(first)} – ${fmt.format(last)}`; }
+  }
+  // newest first: by the last day photographed, else the album's date
+  const albumSortKey = a => (takenRange(a) || [])[1] || a.date || '';
+
+  const cardHidesDates = a => (PHOTO_SECTIONS.find(s => s.id === a.section) || {}).hideDates === true;
+  const albumMeta = (a, card = false) => [
+    !(card && cardHidesDates(a)) && albumWhen(a),
     a.location,
     `${gridPhotos(a).length} photo${gridPhotos(a).length === 1 ? '' : 's'}`,
   ].filter(Boolean).join(' · ');
@@ -110,7 +170,7 @@
       <img class="album-cover${full ? ' album-cover--full' : ''}" src="${esc(full ? c.src : c.thumb)}" alt="" width="${esc(Number(c.w) || 0)}" height="${esc(Number(c.h) || 0)}" loading="${full ? 'eager' : 'lazy'}" decoding="async"${bg} data-focus-src="${esc(c.thumb)}"${c.focus ? ` data-focus="${esc(c.focus.x)},${esc(c.focus.y)}"` : ''}>
       <div class="album-text">
         <${tag} class="album-name">${esc(a.name)}</${tag}>
-        <p class="album-meta">${esc(albumMeta(a))}</p>
+        <p class="album-meta">${esc(albumMeta(a, !full))}</p>
       </div>`;
   }
 
@@ -524,7 +584,7 @@
     root.classList.remove('in-album');
     if (featuredEl && !featuredEl.children.length) renderFeatured();
     else beltStart();
-    const albums = PHOTO_ALBUMS.filter(a => a.section === section && !a.unlisted).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    const albums = PHOTO_ALBUMS.filter(a => a.section === section && !a.unlisted).sort((a, b) => albumSortKey(b).localeCompare(albumSortKey(a)));
     viewEl.innerHTML = albums.length
       ? `<div class="album-list">${albums.map(a => `
           <a class="album-card" href="#${esc(a.id)}" data-album="${esc(a.id)}">${bannerHTML(a, 'h2')}</a>`).join('')}</div>`
@@ -535,7 +595,8 @@
   // Album view: banner with the name on top, then the grid
   function renderAlbum(a) {
     currentAlbum = a;
-    shown = gridPhotos(a);
+    const days = photosByDay(a);
+    shown = days.flatMap(d => d.photos); // the viewer pages in the same order as the grid
     if (!a.unlisted) { section = a.section; updateChips(); } // unlisted albums belong to no section
     root.classList.add('in-album');
     beltStop();
@@ -544,19 +605,39 @@
         <a class="album-back" href="${esc(location.pathname)}" data-back>&#8592; ${esc(a.unlisted ? 'Back' : sectionName(a.section))}</a>
         ${bannerHTML(a, 'h2', true)}
       </div>
-      <div class="photo-grid">${shown.map((p, i) => {
-        const w = Number(p.w) || 0, h = Number(p.h) || 0, ratio = w && h ? (w / h).toFixed(4) : '1.5';
-        return `
-        <a class="photo-tile" href="${esc(p.src)}" data-id="${esc(p.id)}" data-ratio="${esc(ratio)}" aria-label="${esc(photoLabel(p, a, i))}">
-          <img src="${esc(p.thumb)}" alt="${esc(photoLabel(p, a, i))}" width="${esc(w)}" height="${esc(h)}" loading="lazy" decoding="async">
-        </a>`; }).join('')}</div>`;
-    grid = viewEl.querySelector('.photo-grid');
+      <div class="album-days">${albumDaysHTML(a, days)}</div>`;
+    grid = viewEl.querySelector('.album-days');
     focusCovers(viewEl);
     layout();
     if (ro) ro.disconnect();
     ro = new ResizeObserver(layout);
     ro.observe(grid);
     grid.querySelectorAll('img').forEach(img => { if (img.complete && img.naturalWidth) img.classList.add('is-loaded'); });
+  }
+
+  // One justified grid per day, each under its date; a single plain grid when there is one day
+  function albumDaysHTML(a, days) {
+    let n = 0;
+    const tiles = list => list.map(p => {
+      const i = n++;
+      const w = Number(p.w) || 0, h = Number(p.h) || 0, ratio = w && h ? (w / h).toFixed(4) : '1.5';
+      return `
+        <a class="photo-tile" href="${esc(p.src)}" data-id="${esc(p.id)}" data-ratio="${esc(ratio)}" aria-label="${esc(photoLabel(p, a, i))}">
+          <img src="${esc(p.thumb)}" alt="${esc(photoLabel(p, a, i))}" width="${esc(w)}" height="${esc(h)}" loading="lazy" decoding="async">
+        </a>`;
+    }).join('');
+    if (days.length === 1) return `<div class="photo-grid">${tiles(days[0].photos)}</div>`;
+    const years = new Set(days.filter(d => d.day).map(d => d.day.slice(0, 4)));
+    return days.map((d, k) => `
+      <section class="album-day"${d.day ? ` id="day-${esc(d.day)}"` : ''} aria-labelledby="album-day-${k}">
+        <h3 class="album-day-title" id="album-day-${k}">
+          ${d.day
+            ? `<a class="album-day-link" href="${esc(hashFor(a.id, d.day))}" data-day="${esc(d.day)}" title="Copy a link to this day"><time datetime="${esc(d.day)}">${esc(dayTitle(d.day, years.size > 1))}</time></a>`
+            : esc(dayTitle(''))}
+          <span class="album-day-count">${d.photos.length} photo${d.photos.length === 1 ? '' : 's'}</span>
+        </h3>
+        <div class="photo-grid">${tiles(d.photos)}</div>
+      </section>`).join('');
   }
 
   function renderChips() {
@@ -619,7 +700,14 @@
     if (!viewEl.children.length) viewEl.innerHTML = '<p class="photo-empty">Loading album…</p>';
     privateLoads.get(id).then(a => {
       if (!root || !root.isConnected || parseHash().album !== id) return; // navigated away meanwhile
-      if (!a) {
+      // The album was published: send the old private link to its public URL, keeping the photo
+      if (a && a.moved && albumById.has(a.moved)) {
+        history.replaceState(null, '', hashFor(a.moved, null));
+        if (r.photo && !isOpen) history.pushState({ viewer: true }, '', hashFor(a.moved, r.photo));
+        applyRoute(parseHash(), { animate: false });
+        return;
+      }
+      if (!a || a.moved) {
         privateLoads.delete(id); // allow a retry
         renderList();
         viewEl.insertAdjacentHTML('afterbegin', '<p class="photo-empty">That album link isn’t valid, or the album is no longer shared.</p>');
@@ -636,22 +724,46 @@
 
   function applyRoute(r, { animate = true } = {}) {
     if (r.album && r.album.startsWith('u/') && !albumById.has(r.album)) { loadPrivate(r); return; }
+    // An album that was merged into another: send its link (and a day link) there. Photo ids
+    // changed in the merge, so a photo link opens the album instead.
+    const alias = r.album && !albumById.has(r.album) && typeof PHOTO_ALIASES !== 'undefined' ? PHOTO_ALIASES[r.album] : null;
+    if (alias && albumById.has(alias)) {
+      const keep = /^\d{4}-\d{2}-\d{2}$/.test(r.photo || '') ? r.photo : null;
+      history.replaceState(history.state, '', hashFor(alias, keep));
+      return applyRoute(parseHash(), { animate });
+    }
     const album = r.album ? albumById.get(r.album) : null;
     const photo = album && r.photo ? album.photos.find(p => p.id === r.photo) : null;
+    // #<album>/<YYYY-MM-DD>: that day within the album (a photo with that id would win)
+    const day = album && !photo && /^\d{4}-\d{2}-\d{2}$/.test(r.photo || '') ? r.photo : null;
     if (album !== currentAlbum || !viewEl.children.length) {
       const changed = album !== currentAlbum;
       // No morph when the viewer is about to cover the page anyway
       swapView(() => {
         album ? renderAlbum(album) : renderList();
-        if (changed) window.scrollTo(0, 0); // inside the swap so the morph starts from the top
-      }, animate && !photo);
+        if (day) scrollToDay(day, false);
+        else if (changed) window.scrollTo(0, 0); // inside the swap so the morph starts from the top
+      }, animate && !photo && !day);
+    } else if (day) {
+      scrollToDay(day, !reduceMotion.matches);
     }
     if (photo) {
-      if (!isOpen || items !== album.photos) openViewer(album.photos, album.photos.indexOf(photo), { push: false });
-      else if (items[idx] !== photo) show(album.photos.indexOf(photo), 0);
+      // page in the grid's order (newest first by date taken), whichever way the photo was reached
+      const list = currentAlbum === album ? shown : gridPhotos(album);
+      const at = Math.max(0, list.indexOf(photo));
+      if (!isOpen || items !== list) openViewer(list, at, { push: false });
+      else if (items[idx] !== photo) show(at, 0);
     } else if (isOpen) {
       closeViewer({ fromHistory: true });
     }
+  }
+
+  // Brings a day of the open album to the top of the screen (its title then pins there)
+  function scrollToDay(day, smooth) {
+    const el = document.getElementById('day-' + day);
+    if (!el) return;
+    const top = el.getBoundingClientRect().top + window.scrollY;
+    window.scrollTo({ top, behavior: smooth ? 'smooth' : 'auto' });
   }
 
   let initToken = 0;
@@ -720,6 +832,17 @@
       e.preventDefault();
       history.pushState(null, '', hashFor(card.dataset.album, null));
       applyRoute(parseHash());
+      return;
+    }
+
+    const dayLink = e.target.closest('.album-day-link');
+    if (dayLink && currentAlbum) {
+      e.preventDefault();
+      const hash = hashFor(currentAlbum.id, dayLink.dataset.day);
+      history.replaceState(history.state, '', hash);
+      scrollToDay(dayLink.dataset.day, !reduceMotion.matches);
+      const url = location.origin + location.pathname + hash;
+      navigator.clipboard?.writeText(url).then(() => { if (typeof showToast === 'function') showToast(); }).catch(() => {});
       return;
     }
 
@@ -863,7 +986,8 @@
     const x = p.exif || {};
     const rows = [
       ['Album', currentAlbum && currentAlbum.name],
-      ['Date', p.date && fmtDate(p.date)],
+      ['Taken', takenOf(p) && new Date(takenOf(p)).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })],
+      ['Date', !takenOf(p) && p.date && fmtDate(p.date)],
       ['Camera', x.camera],
       ['Lens', x.lens],
       ['Focal length', x.focal],

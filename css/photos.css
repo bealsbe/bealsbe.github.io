@@ -390,6 +390,68 @@
   border-radius: 2px;
 }
 
+/* --- Days within an album: newest first, each under a date that stays pinned while you scroll it.
+   The title borrows the Character Ref page's section-title type. --- */
+.album-day + .album-day {
+  margin-top: 40px;
+}
+
+.album-day-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 14px;
+  row-gap: 4px;
+  margin: 0 0 12px;
+  padding: 14px 0 10px;
+  background: #0d0d15; /* the card's colour, so photos scroll away under it */
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.66rem;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+/* The date links to that day; it copies the link when clicked */
+.album-day-link {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 150ms ease;
+}
+
+.album-day-link:hover {
+  border-bottom-color: currentColor;
+}
+
+.album-day-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.album-day-count {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+@media (max-width: 699px) {
+  .album-day + .album-day {
+    margin-top: 28px;
+  }
+
+  .album-day-title {
+    font-size: 0.58rem;
+    padding: 12px 0 8px;
+  }
+}
+
 /* --- Justified grid: js/photos.js sets each tile's width/height so rows fill the card exactly --- */
 .photo-grid {
   --gap: 8px;
