@@ -604,12 +604,18 @@ window.addEventListener('load', async () => {
   // BFS read-head — avoids queue.shift() O(n) cost (opt 3)
   let qHead = 0;
 
-  function draw() {
+  // The motion constants below were tuned per frame at 60fps. Each frame is scaled by how much
+  // time really passed, so the speed is the same on a 60Hz, 144Hz or 240Hz display.
+  let prevFrameTime = 0;
+  function draw(now) {
     rafId = requestAnimationFrame(draw);
+
+    const f = prevFrameTime ? Math.min(3, (now - prevFrameTime) / (1000 / 60)) : 1;
+    prevFrameTime = now;
 
     ctx.clearRect(0, 0, W, H);
 
-    twinkleTime += 1 / 1400;
+    twinkleTime += f / 1400;
 
     ctx.fillStyle = SKY;
     ctx.fillRect(0, 0, W, H);
@@ -618,8 +624,8 @@ window.addEventListener('load', async () => {
 
     let lastAlpha = -1;
     for (const s of sprites) {
-      s.speed += 0.002;
-      s.z -= s.speed;
+      s.speed += 0.002 * f;
+      s.z -= s.speed * f;
 
       if (s.z <= Z_NEAR) { Object.assign(s, randomSprite(false)); continue; }
 
@@ -649,8 +655,8 @@ window.addEventListener('load', async () => {
     starDraws.length = 0;
     let starPoolIdx = 0;
     for (const s of stars) {
-      s.speed += 0.0002;
-      s.z -= s.speed;
+      s.speed += 0.0002 * f;
+      s.z -= s.speed * f;
       s.sx = null;
 
       if (s.z <= Z_NEAR) { resetStar(s); continue; }
@@ -660,7 +666,7 @@ window.addEventListener('load', async () => {
 
       if (sx < 0 || sx > W || sy < 0 || sy > H) { resetStar(s); continue; }
 
-      s.fadeIn = Math.min(1, s.fadeIn + 0.008); // opt 5: fadeIn always set, ?? 1 removed
+      s.fadeIn = Math.min(1, s.fadeIn + 0.008 * f); // opt 5: fadeIn always set, ?? 1 removed
       const tFar    = Math.min(1, (Z_FAR - s.z) / (Z_FAR * 0.25));
       const tNear   = Math.min(1, (s.z - Z_NEAR) / (Z_NEAR * 2));
       const twinkle = 0.7 + 0.3 * Math.sin(twinkleTime * s.twinkleSpd + s.phase);
@@ -775,6 +781,7 @@ window.addEventListener('load', async () => {
     if (document.hidden) {
       cancelAnimationFrame(rafId);
       rafId = 0;
+      prevFrameTime = 0;
     } else if (!rafId) {
       rafId = requestAnimationFrame(draw);
     }

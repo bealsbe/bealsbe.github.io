@@ -215,11 +215,19 @@
 
   /* --- Featured belt: a conveyor of hand-picked photos at their real aspect ratio. It drifts
      slowly on its own, eases to a stop while hovered or handled, and can be wheel-scrolled,
-     dragged or swiped like any strip. The set is repeated so it loops without a visible seam.
-     The drift is a compositor-run transform animation on the track, so it stays smooth even when
-     the main thread is busy; user scrolling moves the native scroller underneath it. --- */
-  const BELT_SPEED = 20;  // px per second
-  const belt = { items: [], el: null, track: null, copies: 1, anim: null, rate: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false };
+     dragged or swiped like any strip. Photos repeat so it loops without a visible seam.
+
+     Only the photos near the viewport exist in the DOM. Each one is a small, absolutely placed
+     element with its own compositor-run transform animation sliding it left at BELT_SPEED, and
+     photos are recycled as they leave one side and are needed on the other. One huge animated
+     track would be refused by Firefox's compositor (it falls back to repainting every frame),
+     so the animated pieces are kept smaller than the viewport. The strip itself is a native
+     horizontal scroller, so wheel, drag, swipe and keyboard focus all move it the usual way. --- */
+  const BELT_SPEED = 20;    // px per second
+  const BELT_GAP = 8;       // px between photos, matches .belt-track's spacing in the CSS
+  const BELT_RUN = 200000;  // px each photo's animation covers before it would ever end
+  const TRACK_SPAN = 16;    // scroller content is this many viewports wide, re-centred as you near an end
+  const belt = { items: [], el: null, track: null, placed: [], height: 0, trackW: 0, rate: 0, raf: 0, last: 0, hover: false, hold: 0, drag: null, dragged: false, preloaded: false };
 
   // The set is shuffled once per page load and keeps that order until the frontend reloads
   let featuredOrder = null;
@@ -241,14 +249,20 @@
     return items.sort((a, b) => rank(a) - rank(b));
   }
 
-  function beltItemHTML({ album, photo }, copy) {
-    const w = Number(photo.w) || 3, h = Number(photo.h) || 2;
-    // Every copy loads eagerly: the thumbnails are small and shared, and a lazy copy would pop in mid-drift
-    return `
-      <a class="belt-item" href="${esc(hashFor(album.id, photo.id))}" data-album="${esc(album.id)}" data-photo="${esc(photo.id)}" style="aspect-ratio: ${w} / ${h}"${copy ? ' aria-hidden="true" tabindex="-1"' : ''}>
-        <img src="${esc(photo.thumb)}" alt="${esc(photoLabel(photo, album, -1))}" width="${w}" height="${h}" decoding="async">
-        <span class="belt-caption"><span class="belt-title">${esc(photo.title || album.name)}</span>${photo.title ? `<span class="belt-album">${esc(album.name)}</span>` : ''}</span>
-      </a>`;
+  const beltItemWidth = ({ photo }) => belt.height * ((Number(photo.w) || 3) / (Number(photo.h) || 2));
+
+  function beltItemEl({ album, photo }, width, copy) {
+    const a = document.createElement('a');
+    a.className = 'belt-item';
+    a.href = hashFor(album.id, photo.id);
+    a.dataset.album = album.id;
+    a.dataset.photo = photo.id;
+    a.style.width = width + 'px';
+    if (copy) { a.setAttribute('aria-hidden', 'true'); a.tabIndex = -1; }
+    a.innerHTML = `
+        <img src="${esc(photo.thumb)}" alt="${esc(photoLabel(photo, album, -1))}" decoding="async">
+        <span class="belt-caption"><span class="belt-title">${esc(photo.title || album.name)}</span>${photo.title ? `<span class="belt-album">${esc(album.name)}</span>` : ''}</span>`;
+    return a;
   }
 
   function renderFeatured() {
@@ -259,14 +273,10 @@
     if (!belt.items.length) { featuredEl.innerHTML = ''; return; }
     featuredEl.innerHTML = `
       <section class="belt-section" aria-label="Featured photos">
-        <div class="belt">
-          <div class="belt-track">${belt.items.map(it => beltItemHTML(it, 0)).join('')}</div>
-        </div>
+        <div class="belt"><div class="belt-track"></div></div>
       </section>`;
     belt.el = featuredEl.querySelector('.belt');
     belt.track = featuredEl.querySelector('.belt-track');
-    belt.copies = 1;
-    fillBelt();
 
     const el = belt.el;
     el.addEventListener('mouseenter', () => { belt.hover = true; beltStart(); });
@@ -276,7 +286,7 @@
     el.addEventListener('wheel', () => beltHold(2500), { passive: true });
     el.addEventListener('touchstart', () => beltHold(4000), { passive: true });
     el.addEventListener('touchend', () => beltHold(2500), { passive: true });
-    el.addEventListener('scroll', wrapBelt, { passive: true });
+    el.addEventListener('scroll', onBeltScroll, { passive: true });
     // Mouse drag scrolls the strip. No pointer capture: it would retarget the click to the strip
     // and the photo under the pointer would no longer open.
     el.addEventListener('pointerdown', e => {
@@ -286,92 +296,159 @@
       beltStart();
       e.preventDefault(); // no native image/link drag
     });
+
+    if (!belt.preloaded) { // warm the cache so photos never pop in as they arrive from the right
+      belt.preloaded = true;
+      for (const { photo } of belt.items) { const im = new Image(); im.decoding = 'async'; im.src = photo.thumb; }
+    }
     beltStart();
   }
 
-  const setWidth = () => belt.track ? belt.track.scrollWidth / belt.copies : 0;
+  // Where a placed photo is right now, in scroller coordinates
+  const placedX = it => it.startX - BELT_SPEED * ((it.anim && it.anim.currentTime) || 0) / 1000;
 
-  // Repeat the set until the strip can show any scroll position plus a full set of drift without
-  // running out of photos, start in the middle copy, and (re)build the drift animation for this width
-  function fillBelt() {
+  // x is the photo's position in the same frame of reference as its neighbour's startX. The new
+  // animation is locked to the neighbour's clock (same start time and rate), so the spacing
+  // between them is exact for as long as both exist instead of depending on when this ran.
+  function placeBeltItem(idx, x, atFront, ref) {
+    const item = belt.items[idx];
+    const w = beltItemWidth(item);
+    const copy = belt.placed.some(o => o.idx === idx);
+    const el = beltItemEl(item, w, copy);
+    if (atFront) belt.track.prepend(el); else belt.track.append(el);
+    const placed = { idx, el, w, startX: x, anim: null };
+    if (typeof el.animate === 'function') {
+      const anim = placed.anim = el.animate(
+        [{ transform: `translate3d(${x}px, 0, 0)` }, { transform: `translate3d(${x - BELT_RUN}px, 0, 0)` }],
+        { duration: (BELT_RUN / BELT_SPEED) * 1000, fill: 'forwards', easing: 'linear' }
+      );
+      const ra = ref && ref.anim;
+      if (ra && ra.startTime !== null && ra.playState === 'running') {
+        anim.playbackRate = ra.playbackRate;
+        anim.startTime = ra.startTime;
+      } else {
+        anim.playbackRate = belt.rate;
+        if (ra) anim.currentTime = ra.currentTime || 0;
+        if (!belt.rate) anim.pause();
+      }
+    } else {
+      el.style.transform = `translate3d(${x}px, 0, 0)`;
+    }
+    if (atFront) belt.placed.unshift(placed); else belt.placed.push(placed);
+    return placed;
+  }
+  function removeBeltItem(placed) {
+    if (placed.anim) placed.anim.cancel();
+    placed.el.remove();
+  }
+
+  // Add photos where the viewport (plus a margin) is uncovered and drop the ones far outside it
+  function layoutBelt() {
+    const el = belt.el;
+    if (!el || !belt.items.length || !belt.height) return;
+    const n = belt.items.length, cw = el.clientWidth, sl = el.scrollLeft;
+    const margin = Math.max(300, cw * 0.5);
+    const lo = sl - margin, hi = sl + cw + margin;
+    if (!belt.placed.length) placeBeltItem(0, sl, false);
+    let tail = belt.placed[belt.placed.length - 1];
+    while (placedX(tail) + tail.w + BELT_GAP < hi && belt.placed.length < 400) {
+      tail = placeBeltItem((tail.idx + 1) % n, tail.startX + tail.w + BELT_GAP, false, tail);
+    }
+    let head = belt.placed[0];
+    while (placedX(head) > lo && belt.placed.length < 400) {
+      const idx = (head.idx - 1 + n) % n;
+      head = placeBeltItem(idx, head.startX - BELT_GAP - beltItemWidth(belt.items[idx]), true, head);
+    }
+    while (belt.placed.length > 1 && placedX(belt.placed[0]) + belt.placed[0].w < lo - margin) removeBeltItem(belt.placed.shift());
+    while (belt.placed.length > 1 && placedX(belt.placed[belt.placed.length - 1]) > hi + margin) removeBeltItem(belt.placed.pop());
+  }
+
+  // Size the scroller's content and start in the middle of it, with the first photo at the left edge
+  function buildBelt() {
     const el = belt.el, track = belt.track;
     if (!el || !track) return;
-    const one = setWidth();
-    if (!one) return;
-    const need = Math.ceil(2.5 + (el.clientWidth + 400) / one); // +400px covers a fling's overshoot before it wraps
-    if (need > belt.copies) {
-      track.insertAdjacentHTML('beforeend', Array.from({ length: need - belt.copies }, () => belt.items.map(it => beltItemHTML(it, 1)).join('')).join(''));
-      belt.copies = need;
+    for (const p of belt.placed) removeBeltItem(p);
+    belt.placed = [];
+    belt.height = el.clientHeight;
+    belt.trackW = Math.max(1, el.clientWidth) * TRACK_SPAN;
+    track.style.width = belt.trackW + 'px';
+    if (!belt.height) return; // hidden (an album is open); built again when shown
+    el.scrollLeft = belt.trackW / 2;
+    layoutBelt();
+  }
+
+  // The user scrolled: keep the viewport covered, and when it nears an end of the content jump
+  // everything back to the middle in the same frame so nothing visibly moves
+  function onBeltScroll() {
+    const el = belt.el;
+    if (!el || !belt.trackW) return;
+    const sl = el.scrollLeft;
+    if (sl < belt.trackW * 0.2 || sl > belt.trackW * 0.8 - el.clientWidth) {
+      const shift = belt.trackW / 2 - sl;
+      el.scrollLeft = sl + shift;
+      if (belt.drag) belt.drag.from += shift;
+      for (const p of belt.placed) {
+        p.startX += shift;
+        if (p.anim) p.anim.effect.setKeyframes([{ transform: `translate3d(${p.startX}px, 0, 0)` }, { transform: `translate3d(${p.startX - BELT_RUN}px, 0, 0)` }]);
+        else p.el.style.transform = `translate3d(${p.startX}px, 0, 0)`;
+      }
     }
-    el.scrollLeft = setWidth();
-    buildDrift();
-  }
-
-  // One set's worth of travel, repeated forever: at the end of a loop the track snaps back by
-  // exactly one set, which looks identical. The animation is kept paused when the strip should
-  // be still and its playback rate is eased between 0 and 1 by beltTick.
-  function buildDrift() {
-    const one = setWidth();
-    if (!belt.track || !one || typeof belt.track.animate !== 'function') return;
-    const progress = belt.anim && belt.anim.effect ? (belt.anim.currentTime || 0) / belt.anim.effect.getTiming().duration : 0;
-    if (belt.anim) belt.anim.cancel();
-    belt.anim = belt.track.animate(
-      [{ transform: 'translate3d(0, 0, 0)' }, { transform: `translate3d(${-one}px, 0, 0)` }],
-      { duration: (one / BELT_SPEED) * 1000, iterations: Infinity, easing: 'linear' }
-    );
-    belt.anim.currentTime = (progress % 1) * (one / BELT_SPEED) * 1000;
-    belt.anim.playbackRate = belt.rate;
-    if (!belt.rate) belt.anim.pause();
-  }
-
-  // Keep the scroller inside the middle copy; the strip looks the same one set left or right
-  function wrapBelt() {
-    const one = setWidth(), el = belt.el;
-    if (!one || !el) return;
-    let shift = 0;
-    if (el.scrollLeft < one * 0.5) shift = one;
-    else if (el.scrollLeft >= one * 1.5) shift = -one;
-    if (!shift) return;
-    el.scrollLeft += shift;
-    if (belt.drag) belt.drag.from += shift;
+    layoutBelt();
   }
 
   const beltWantsMotion = () => !belt.hover && !belt.drag && performance.now() > belt.hold && !document.hidden && !reduceMotion.matches;
 
   // Ease the playback rate toward 1 (drifting) or 0 (still) so the strip glides to a stop and
   // picks up again instead of jerking. The loop only runs while the rate is changing or a hold
-  // is pending.
+  // is pending; while drifting it also tops up photos on the right every so often.
   function beltTick(now) {
     belt.raf = 0;
-    if (!belt.el || !belt.el.isConnected || !belt.anim) return;
+    if (!belt.el || !belt.el.isConnected) return;
     const dt = Math.min(0.1, (now - belt.last) / 1000);
     belt.last = now;
     const target = beltWantsMotion() ? 1 : 0;
-    const k = 1 - Math.exp(-dt * (target ? 3 : 6)); // ~0.3s to ease in, ~0.15s to ease out
+    const k = 1 - Math.exp(-dt * (target ? 3 : 6)); // ~1s to ease in, ~0.5s to ease out
     let rate = belt.rate + (target - belt.rate) * k;
     if (Math.abs(target - rate) < 0.01) rate = target;
     if (rate !== belt.rate) {
       belt.rate = rate;
-      if (rate && belt.anim.playState === 'paused') belt.anim.play();
-      // updatePlaybackRate changes speed in step with the compositor, so there is no hitch
-      if (belt.anim.updatePlaybackRate) belt.anim.updatePlaybackRate(rate); else belt.anim.playbackRate = rate;
-      if (!rate) belt.anim.pause();
+      for (const { anim } of belt.placed) {
+        if (!anim) continue;
+        if (rate && anim.playState === 'paused') anim.play();
+        // updatePlaybackRate changes speed in step with the compositor, so there is no hitch
+        if (anim.updatePlaybackRate) anim.updatePlaybackRate(rate); else anim.playbackRate = rate;
+        if (!rate) anim.pause();
+      }
     }
     const settled = rate === target && (target === 1 || performance.now() > belt.hold);
     if (!settled) belt.raf = requestAnimationFrame(beltTick);
+    else if (target === 1) beltRefill();
+  }
+  // While drifting, photos arrive from the right at BELT_SPEED; a cheap periodic check keeps the
+  // margin stocked without a per-frame loop
+  function beltRefill() {
+    clearTimeout(belt.refill);
+    belt.refill = setTimeout(() => {
+      if (!belt.el || !belt.el.isConnected || belt.raf) return;
+      layoutBelt();
+      if (beltWantsMotion()) beltRefill();
+    }, 1000);
   }
   function beltStart() {
     if (!belt.el || belt.raf) return;
     // After a stop (an album was open, which also hides the strip and drops its scroll position)
-    // the strip is re-centred and the drift rebuilt
-    if (!belt.anim && belt.track && typeof belt.track.animate === 'function') fillBelt();
+    // the strip is rebuilt
+    if (!belt.placed.length) buildBelt();
+    clearTimeout(belt.refill);
     belt.last = performance.now();
     belt.raf = requestAnimationFrame(beltTick);
   }
   function beltStop() {
     if (belt.raf) cancelAnimationFrame(belt.raf);
     belt.raf = 0;
-    if (belt.anim) { belt.anim.cancel(); belt.anim = null; }
+    clearTimeout(belt.refill);
+    for (const p of belt.placed) removeBeltItem(p);
+    belt.placed = [];
     belt.rate = 0;
   }
   const beltHold = ms => { belt.hold = Math.max(belt.hold, performance.now() + ms); beltStart(); };
@@ -387,7 +464,12 @@
   window.addEventListener('pointercancel', endBeltDrag);
 
   document.addEventListener('visibilitychange', () => { if (!currentAlbum) beltStart(); });
-  window.addEventListener('resize', () => { if (belt.el) fillBelt(); });
+  let beltResize = 0;
+  window.addEventListener('resize', () => {
+    if (!belt.el || !belt.el.clientHeight) return;
+    clearTimeout(beltResize);
+    beltResize = setTimeout(() => { buildBelt(); beltStart(); }, 150);
+  });
 
   // Section view: one banner per album (folder), newest first
   function renderList() {
@@ -631,7 +713,6 @@
       <h2 class="pv-info-title"></h2>
       <p class="pv-info-caption"></p>
       <dl class="pv-meta"></dl>
-      <a class="pv-original" target="_blank" rel="noopener">Open original &#8599;</a>
     </aside>`;
   document.body.appendChild(pv);
 
@@ -651,7 +732,6 @@
   const infoTitle   = $('.pv-info-title');
   const infoCaption = $('.pv-info-caption');
   const meta        = $('.pv-meta');
-  const original    = $('.pv-original');
 
   const INTERVAL = 4000;
   let items = [], idx = 0;
@@ -694,7 +774,6 @@
       ['Size', p.w && p.h && `${p.w} × ${p.h}`],
     ].filter(([, v]) => v !== undefined && v !== null && v !== '');
     meta.innerHTML = rows.map(([k, v]) => `<div class="pv-meta-row"><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
-    original.href = p.src;
   }
 
   function buildFilm() {

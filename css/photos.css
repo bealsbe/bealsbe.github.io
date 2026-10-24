@@ -125,18 +125,21 @@
 }
 
 .belt-track {
-  display: flex;
-  gap: 8px;
-  width: max-content;
-  will-change: transform; /* the drift nudges the track by fractions of a pixel every frame */
+  position: relative;
+  height: var(--belt-h);
+  /* width is set by js/photos.js: many viewports wide, re-centred as you scroll near an end */
 }
 
-/* Each item takes its photo's aspect ratio at the strip height, so nothing is cropped */
+/* Each item is placed by its own transform (js/photos.js), sized to its photo's aspect ratio
+   at the strip height so nothing is cropped. Items are kept smaller than the viewport so the
+   browser can run their drift on the compositor. */
 .belt-item {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  flex: 0 0 auto;
   height: var(--belt-h);
+  will-change: transform;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.045);
   color: var(--text);
@@ -848,20 +851,6 @@ html.pv-open {
   margin: 0;
   text-align: right;
   color: var(--text);
-}
-
-.pv-original {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.7);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  padding-bottom: 1px;
-  transition: color 150ms ease, border-color 150ms ease;
-}
-
-.pv-original:hover {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
 }
 
 /* --- Phones: details become a bottom sheet, chrome gets shorter --- */
