@@ -640,6 +640,16 @@ html.pv-open {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.pv-btn[hidden] {
+  display: none;
+}
+
+.pv-btn[aria-busy="true"] {
+  color: var(--accent);
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .pv-btn[aria-pressed="true"] {
   color: var(--accent);
 }

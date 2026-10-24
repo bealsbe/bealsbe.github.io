@@ -40,7 +40,7 @@ const PHOTO_DATA_READY = (async () => {
   photoBase = url === PHOTO_SOURCE.base + PHOTO_SOURCE.manifest ? PHOTO_SOURCE.base : url.replace(/[^/]*$/, '');  // url is already origin-checked
 
   try {
-    const res = await fetch(url, { cache: 'no-cache' });
+    const res = await fetch(url);  // the bucket's Cache-Control (5 minutes) decides how long a copy is reused
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const m = await res.json();
     const data = manifestToData(m, photoBase);
@@ -83,7 +83,7 @@ function manifestToData(m, base) {
 async function loadPrivateAlbum(folder) {
   if (!/^[a-z0-9][a-z0-9-]{0,160}$/.test(folder)) return null;
   try {
-    const res = await fetch(`${photoBase}private/${folder}/manifest.json`, { cache: 'no-cache' });
+    const res = await fetch(`${photoBase}private/${folder}/manifest.json`);
     if (!res.ok) return null;
     const m = await res.json();
     if (!m || m.version !== 1 || !m.album || typeof m.album !== 'object') return null;

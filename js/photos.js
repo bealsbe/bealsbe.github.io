@@ -271,6 +271,7 @@
     if (!featuredEl) return;
     beltStop();
     belt.items = featuredItems();
+    belt.anchor = null;
     belt.el = belt.track = null;
     if (!belt.items.length) { featuredEl.innerHTML = ''; return; }
     featuredEl.innerHTML = `
@@ -382,16 +383,32 @@
   }
 
   // Size the scroller's content and start in the middle of it, with the first photo at the left edge
+  // Where the strip is: the photo at its left edge and how far into it, so a rebuild can carry on
+  // from the same spot instead of jumping back to the first photo
+  function beltAnchor() {
+    const el = belt.el;
+    if (!el || !belt.placed.length || !belt.height) return belt.anchor;
+    // a hidden strip (an album just opened) reads scrollLeft 0, so use the last known position
+    const sl = el.clientWidth ? el.scrollLeft : belt.sl;
+    const p = belt.placed.find(q => placedX(q) + q.w > sl);
+    return p ? { idx: p.idx, frac: Math.min(1, Math.max(0, (sl - placedX(p)) / p.w)) } : belt.anchor;
+  }
+
   function buildBelt() {
     const el = belt.el, track = belt.track;
     if (!el || !track) return;
+    belt.anchor = beltAnchor();
     for (const p of belt.placed) removeBeltItem(p);
     belt.placed = [];
     belt.height = el.clientHeight;
+    belt.cw = el.clientWidth;
     belt.trackW = Math.max(1, el.clientWidth) * TRACK_SPAN;
     track.style.width = belt.trackW + 'px';
     if (!belt.height) return; // hidden (an album is open); built again when shown
     el.scrollLeft = belt.trackW / 2;
+    belt.sl = el.scrollLeft;
+    const a = belt.anchor;
+    if (a && belt.items[a.idx]) placeBeltItem(a.idx, el.scrollLeft - a.frac * beltItemWidth(belt.items[a.idx]), false);
     layoutBelt();
   }
 
@@ -401,9 +418,12 @@
     const el = belt.el;
     if (!el || !belt.trackW) return;
     const sl = el.scrollLeft;
+    if (!el.clientWidth) return; // hidden: the browser zeroes the position; keep the last real one
+    belt.sl = sl;
     if (sl < belt.trackW * 0.2 || sl > belt.trackW * 0.8 - el.clientWidth) {
       const shift = belt.trackW / 2 - sl;
       el.scrollLeft = sl + shift;
+      belt.sl = el.scrollLeft;
       if (belt.drag) belt.drag.from += shift;
       for (const p of belt.placed) {
         p.startX += shift;
@@ -465,6 +485,7 @@
     if (belt.raf) cancelAnimationFrame(belt.raf);
     belt.raf = 0;
     clearTimeout(belt.refill);
+    belt.anchor = beltAnchor(); // back from an album, the strip resumes where it was
     for (const p of belt.placed) removeBeltItem(p);
     belt.placed = [];
     belt.rate = 0;
@@ -486,7 +507,13 @@
   window.addEventListener('resize', () => {
     if (!belt.el || !belt.el.clientHeight) return;
     clearTimeout(beltResize);
-    beltResize = setTimeout(() => { buildBelt(); beltStart(); }, 150);
+    beltResize = setTimeout(() => {
+      // Phones fire resize when the address bar slides in or out during a page scroll; the strip's
+      // own size doesn't change then, so there is nothing to rebuild
+      if (!belt.el || (belt.el.clientWidth === belt.cw && belt.el.clientHeight === belt.height)) return;
+      buildBelt();
+      beltStart();
+    }, 150);
   });
 
   // Section view: one banner per album (folder), newest first
@@ -721,6 +748,7 @@
     pause:   '<svg class="icon-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg>',
     zoomIn:  '<svg class="icon-zoom-in" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg>',
     zoomOut: '<svg class="icon-zoom-out" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M8 11h6"/></svg>',
+    download: '<svg viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   };
 
   const pv = document.createElement('div');
@@ -734,6 +762,7 @@
       <span class="pv-counter"></span>
       <span class="pv-title"></span>
       <div class="pv-actions">
+        <button type="button" class="pv-btn pv-download" aria-label="Download photo" title="Download (D)" hidden>${ICON.download}</button>
         <button type="button" class="pv-btn pv-zoom" aria-label="Zoom" title="Zoom (Z)">${ICON.zoomIn}${ICON.zoomOut}</button>
         <button type="button" class="pv-btn pv-play" aria-label="Slideshow" aria-pressed="false" title="Slideshow (Space)">${ICON.play}${ICON.pause}</button>
         <button type="button" class="pv-btn pv-infobtn" aria-label="Details" aria-pressed="false" title="Details (I)">${ICON.info}</button>
@@ -769,6 +798,34 @@
   const playBtn  = $('.pv-play');
   const infoBtn  = $('.pv-infobtn');
   const closeBtn = $('.pv-close');
+  const downloadBtn = $('.pv-download');
+
+  // Private albums (a shoot shared by link) offer a download of each photo. The image is on the
+  // bucket's domain, where a plain <a download> would just navigate, so fetch it (CORS allows this
+  // site) and save the blob under a readable name.
+  const canDownload = () => !!(currentAlbum && currentAlbum.private);
+  async function downloadCurrent() {
+    const p = items[idx];
+    if (!p || !canDownload() || downloadBtn.getAttribute('aria-busy') === 'true') return;
+    const base = (currentAlbum.name || 'photo').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-') || 'photo';
+    const file = `${base}-${String(idx + 1).padStart(3, '0')}.jpg`;
+    downloadBtn.setAttribute('aria-busy', 'true');
+    try {
+      const res = await fetch(p.src, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const url = URL.createObjectURL(await res.blob());
+      const a = Object.assign(document.createElement('a'), { href: url, download: file });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch {
+      window.open(p.src, '_blank', 'noopener'); // can't fetch it: open the image so it can be saved by hand
+    } finally {
+      downloadBtn.removeAttribute('aria-busy');
+    }
+  }
+  downloadBtn.addEventListener('click', downloadCurrent);
   const prevBtn  = $('.pv-prev');
   const nextBtn  = $('.pv-next');
   const infoTitle   = $('.pv-info-title');
@@ -841,6 +898,7 @@
     const p = items[idx];
     resetZoom();
     counter.textContent = `${idx + 1} / ${items.length}`;
+    downloadBtn.hidden = !canDownload();
     titleEl.textContent = p.title || (currentAlbum ? currentAlbum.name : '');
     fillInfo(p);
     centerThumb(dir === 0);
@@ -1125,6 +1183,7 @@
       case ' ':          e.preventDefault(); toggleSlideshow(); break;
       case 'i': case 'I': toggleInfo(); break;
       case 'z': case 'Z': toggleZoomAt(); break;
+      case 'd': case 'D': if (canDownload()) downloadCurrent(); else return; break;
       case 'Home':       show(0, -1); break;
       case 'End':        show(items.length - 1, 1); break;
       default: return;
