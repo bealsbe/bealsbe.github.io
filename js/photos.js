@@ -263,7 +263,7 @@
     if (copy) { a.setAttribute('aria-hidden', 'true'); a.tabIndex = -1; }
     a.innerHTML = `
         <img src="${esc(photo.thumb)}" alt="${esc(photoLabel(photo, album, -1))}" decoding="async">
-        <span class="belt-caption"><span class="belt-title">${esc(photo.title || album.name)}</span>${photo.title ? `<span class="belt-album">${esc(album.name)}</span>` : ''}</span>`;
+        ${photo.title ? `<span class="belt-caption"><span class="belt-title">${esc(photo.title)}</span></span>` : ''}`;
     return a;
   }
 
