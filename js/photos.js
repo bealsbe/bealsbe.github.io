@@ -923,10 +923,10 @@
   const closeBtn = $('.pv-close');
   const downloadBtn = $('.pv-download');
 
-  // Private albums (a shoot shared by link) offer a download of each photo. The image is on the
-  // bucket's domain, where a plain <a download> would just navigate, so fetch it (CORS allows this
-  // site) and save the blob under a readable name.
-  const canDownload = () => !!(currentAlbum && currentAlbum.private);
+  // Every album offers a download of each photo. The image is on the bucket's domain, where a plain
+  // <a download> would just navigate, so fetch it (CORS allows this site) and save the blob under a
+  // readable name.
+  const canDownload = () => !!currentAlbum;
   async function downloadCurrent() {
     const p = items[idx];
     if (!p || !canDownload() || downloadBtn.getAttribute('aria-busy') === 'true') return;
