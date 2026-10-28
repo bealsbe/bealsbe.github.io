@@ -296,7 +296,7 @@
   function featuredItems() {
     const items = (typeof PHOTO_FEATURED !== 'undefined' ? PHOTO_FEATURED : []).map(f => {
       const album = albumById.get(f.album);
-      const photo = album && !album.unlisted && album.photos.find(p => p.id === f.photo);
+      const photo = album && (!album.unlisted || album.solo) && album.photos.find(p => p.id === f.photo);
       return photo ? { album, photo } : null;
     }).filter(Boolean);
     const key = it => it.album.id + '/' + it.photo.id;
@@ -685,9 +685,10 @@
   }
 
   // --- hash routing ---
-  // #<album>, #<album>/<photo>, and for private albums #u/<folder> and #u/<folder>/<photo>
+  // #<album>, #<album>/<photo>, for private albums #u/<folder> and #u/<folder>/<photo>, and for a
+  // featured photo from an unlisted or private album its own page, #f/<id> and #f/<id>/<id>
   function parseHash() {
-    const m = location.hash.match(/^#(u\/[a-z0-9-]+|[^/]+)(?:\/([^/]+))?$/);
+    const m = location.hash.match(/^#([uf]\/[a-z0-9-]+|[^/]+)(?:\/([^/]+))?$/);
     return m ? { album: m[1], photo: m[2] || null } : { album: null, photo: null };
   }
   const hashFor = (albumId, photoId) => albumId ? '#' + albumId + (photoId ? '/' + photoId : '') : location.pathname + location.search;

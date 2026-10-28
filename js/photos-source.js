@@ -70,13 +70,26 @@ function allowedManifestURL(raw) {
 // strings are coerced, numbers bounded, and URLs resolved against the bucket and limited to http(s).
 function manifestToData(m, base) {
   if (!m || m.version !== 1 || !Array.isArray(m.albums) || !Array.isArray(m.sections)) throw new Error('unexpected manifest shape');
-  const { str, album } = photoNormaliser(base);
+  const { str, album, photo } = photoNormaliser(base);
   // hideDates: leave the date off this section's album cards (the album page still shows it)
   const sections = m.sections.map(s => ({ id: str(s.id), name: str(s.name) || str(s.id), hideDates: s.hide_dates === true })).filter(s => s.id);
   const albums = m.albums.map(album).filter(a => a.id && a.photos.length);
-  // Slider entries: keep only those that point at a listed album photo that survived the checks
-  const featured = (Array.isArray(m.featured) ? m.featured : []).map(f => ({ album: str(f && f.album), photo: str(f && f.photo) }))
-    .filter(f => { const a = albums.find(x => x.id === f.album); return a && !a.unlisted && a.photos.some(p => p.id === f.photo); });
+  // Slider entries: a listed album's photo, or a photo from an unlisted or private album carried
+  // whole in `solo`. A solo photo gets a page of its own (#f/<id>) that holds just that photo, so
+  // the slider never leads into the album it came from.
+  const featured = [];
+  for (const f of Array.isArray(m.featured) ? m.featured : []) {
+    if (f && f.solo && typeof f.solo === 'object') {
+      const p = photo(f.solo);
+      if (!p || !/^[a-z0-9]{1,64}$/.test(p.id) || albums.some(a => a.id === 'f/' + p.id)) continue;
+      albums.push({ id: 'f/' + p.id, section: '', folder: '', name: p.title || 'Featured photo', date: '', location: '', description: '', cover: p.id, unlisted: true, solo: true, photos: [p] });
+      featured.push({ album: 'f/' + p.id, photo: p.id });
+      continue;
+    }
+    const e = { album: str(f && f.album), photo: str(f && f.photo) };
+    const a = albums.find(x => x.id === e.album);
+    if (a && !a.unlisted && a.photos.some(p => p.id === e.photo)) featured.push(e);
+  }
   // Merged albums: old id -> id of an album that exists
   const aliases = {};
   const idOk = v => typeof v === 'string' && /^[a-z0-9-]{1,160}$/.test(v);
@@ -140,20 +153,23 @@ function photoNormaliser(base) {
     return Object.keys(out).length ? out : null;
   };
 
+  const photo = p => {
+    if (!p || typeof p !== 'object') return null;
+    const w = num(p.w), h = num(p.h), src = url(p.src), thumb = thumbFor(p);
+    if (!str(p.id) || !w || !h || !src || !thumb) return null;   // skip anything the grid can't lay out
+    return {
+      id: str(p.id),
+      file: str(p.file),
+      title: str(p.title).slice(0, 200),
+      caption: str(p.caption).slice(0, 1000),
+      w, h, src, thumb,
+      focus: focusOf(p.focus),
+      exif: exifOf(p.exif),
+    };
+  };
+
   const album = a => {
-    const photos = (Array.isArray(a.photos) ? a.photos : []).map(p => {
-      const w = num(p.w), h = num(p.h), src = url(p.src), thumb = thumbFor(p);
-      if (!str(p.id) || !w || !h || !src || !thumb) return null;   // skip anything the grid can't lay out
-      return {
-        id: str(p.id),
-        file: str(p.file),
-        title: str(p.title).slice(0, 200),
-        caption: str(p.caption).slice(0, 1000),
-        w, h, src, thumb,
-        focus: focusOf(p.focus),
-        exif: exifOf(p.exif),
-      };
-    }).filter(Boolean);
+    const photos = (Array.isArray(a.photos) ? a.photos : []).map(photo).filter(Boolean);
     return {
       id: str(a.id),
       section: str(a.section),
@@ -168,5 +184,5 @@ function photoNormaliser(base) {
       photos,
     };
   };
-  return { str, album };
+  return { str, album, photo };
 }
